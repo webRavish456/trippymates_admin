@@ -25,7 +25,6 @@ interface Banner {
 
 const API_BASE = `${API_BASE_URL}/api/admin/banner`
 
-
 export function BannerTab() {
   const router = useRouter()
   const [banners, setBanners] = useState<Banner[]>([])
