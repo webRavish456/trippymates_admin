@@ -21,6 +21,7 @@ interface UserDetailsDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+
 export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialogProps) {
   if (!user) return null
 
