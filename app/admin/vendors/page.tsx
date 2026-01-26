@@ -15,6 +15,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import { CardSkeleton } from "@/components/ui/skeletons"
+import { useSelector } from "react-redux"
+
+import { RootState } from "@/components/redux/store"
 
 
 interface FileDocument {
@@ -62,7 +66,25 @@ interface ApiResponse {
   pagination: Pagination
 }
 
+type Permission = {
+  module: string;
+  create: boolean;
+  read?: boolean;
+  update?: boolean;
+  delete?: boolean;
+};
+
+type VendorsPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
 export default function VendorManagement() {
+
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -76,6 +98,23 @@ export default function VendorManagement() {
   const { toast } = useToast()
 
   const router = useRouter()
+
+  const [hasPermission, setHasPermission] = useState<VendorsPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })
+
+  useEffect(() => {
+    const vendorsPermission = permissions.find(
+      (p: Permission) => p.module === "vendors"
+    )
+    setHasPermission({
+      create: vendorsPermission?.create ?? false,
+      update: vendorsPermission?.update ?? false,
+      delete: vendorsPermission?.delete ?? false,
+    })
+  }, [])
 
   const [credentials, setCredentials] = useState({
     username: "",
@@ -302,8 +341,12 @@ export default function VendorManagement() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Loading vendors...</div>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <CardSkeleton key={`vendor-skeleton-${index}`} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -315,10 +358,10 @@ export default function VendorManagement() {
           <h1 className="text-3xl font-bold tracking-tight">Vendor Management</h1>
           <p className="text-muted-foreground">Manage vendors and their credentials</p>
         </div>
-        <Button onClick={handleAddVendor}>
+        {hasPermission.create && <Button onClick={handleAddVendor}>
           <Plus className="h-4 w-4 mr-2" />
           Add Vendor
-        </Button>
+        </Button>}
       </div>
 
       <Card>
@@ -406,13 +449,13 @@ export default function VendorManagement() {
                         <Button variant="ghost" size="icon" onClick={() => handleViewDetails(vendor)}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleAllotCredentials(vendor)}>
+                       <Button variant="ghost" size="icon" onClick={() => handleAllotCredentials(vendor)}>
                           <Key className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEditVendor(vendor)}>
+                        {hasPermission.update && <Button variant="ghost" size="icon" onClick={() => handleEditVendor(vendor)}>
                           <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
+                        </Button>}
+                        {hasPermission.delete && <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleToggleStatus(vendor._id)}
@@ -422,7 +465,7 @@ export default function VendorManagement() {
                           ) : (
                             <UserCheck className="h-4 w-4 text-green-600" />
                           )}
-                        </Button>
+                        </Button>}
                         <Button
                           variant="ghost"
                           size="icon"

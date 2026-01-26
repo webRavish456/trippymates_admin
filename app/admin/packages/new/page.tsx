@@ -20,7 +20,7 @@ export default function NewPackagePage() {
         </div>
       </div>
 
-      <PackageForm />
+      <PackageForm isEdit={true} />
     </div>
   )
 }

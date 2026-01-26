@@ -12,6 +12,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import { CardSkeleton } from "@/components/ui/skeletons"
+import { RootState } from "../redux/store"
+import { useSelector } from "react-redux"
 
 interface Testimonial {
   _id: string
@@ -27,7 +30,28 @@ interface Testimonial {
   createdAt: string
 }
 
+type TestimonialsPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+type Permission = {
+  module: string;
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
 export function TestimonialsTab() {
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+  const [hasPermission, setHasPermission] = useState<TestimonialsPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })
+ 
   const [testimonials, setTestimonials] = useState<Testimonial[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -57,6 +81,17 @@ export function TestimonialsTab() {
   useEffect(() => {
     fetchTestimonials()
   }, [currentPage, searchQuery, statusFilter])
+
+  useEffect(() => {
+    const testimonialsPermission = permissions.find(
+      (p: Permission) => p.module === "content"
+    )
+    setHasPermission({
+      create: testimonialsPermission?.create ?? false,
+      update: testimonialsPermission?.update ?? false,
+      delete: testimonialsPermission?.delete ?? false,
+    })
+  }, [])
 
   const fetchTestimonials = async () => {
     try {
@@ -308,10 +343,10 @@ export function TestimonialsTab() {
           <h2 className="text-2xl font-bold">Testimonials</h2>
           <p className="text-sm text-muted-foreground">Manage customer testimonials</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        {hasPermission.create && <Button onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Testimonial
-        </Button>
+        </Button>}  
       </div>
 
       <Card>
@@ -342,7 +377,11 @@ export function TestimonialsTab() {
       </Card>
 
       {loading ? (
-        <div className="text-center py-8">Loading testimonials...</div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <CardSkeleton key={`testimonial-skeleton-${index}`} />
+          ))}
+        </div>
       ) : testimonials.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -409,12 +448,13 @@ export function TestimonialsTab() {
                           <Button variant="ghost" size="sm" onClick={() => openViewDialog(testimonial)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(testimonial)}>
+                          {hasPermission.update && <Button variant="ghost" size="sm" onClick={() => openEditDialog(testimonial)}>
                             <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteTestimonial(testimonial._id)}>
+                          </Button>}
+                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteTestimonial(testimonial._id)}>
                             <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                          </Button>}
+                         
                         </div>
                       </td>
                     </tr>

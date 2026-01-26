@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation"
 import { useState } from "react"
 import {
   LayoutDashboard,
+  Users,
   Map,
   Calendar,
-  Users,
   CreditCard,
   FileText,
   BarChart3,
@@ -22,143 +22,177 @@ import {
   Image,
   UserCheck,
   Bell,
+  Shield,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useAuth } from "@/contexts/auth-context"
-import { canAccessFeature } from "@/lib/auth"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
-interface NavItem {
+import { useSelector } from "react-redux"
+import { RootState } from "@/components/redux/store"
+
+
+
+type SubItem = {
+  name: string
+  href: string
+  module: string
+}
+
+type NavItem = {
   name: string
   href?: string
   icon: any
-  feature: string
-  subItems?: { name: string; href: string }[]
+  module?: string
+  subItems?: SubItem[]
 }
 
+/* ---------------- NAVIGATION ---------------- */
+
 const navigation: NavItem[] = [
-  { name: "Dashboard", href: "/admin", icon: LayoutDashboard, feature: "dashboard" },
-  { 
-    name: "Captains", 
-    icon: UserCheck, 
-    feature: "captain",
+  { name: "Dashboard", href: "/admin", icon: LayoutDashboard, module: "dashboard" },
+
+  {
+    name: "Captains",
+    icon: UserCheck,
     subItems: [
-      { name: "Captain Details", href: "/admin/captain/details" },
-      { name: "Captain Assignment", href: "/admin/captain/assignment" }
-    ]
+      { name: "Captain Details", href: "/admin/captain/details", module: "captain_details" },
+      { name: "Captain Assignment", href: "/admin/captain/assignment", module: "captain_assignment" },
+    ],
   },
-  { name: "Users", href: "/admin/users", icon: Users, feature: "users" },
-  { name: "Vendors", href: "/admin/vendors", icon: Users, feature: "vendors" },
-  { name: "Explore Destination", href: "/admin/explore-destination", icon: MapPin, feature: "explore_destination" },
-  { name: "Community", href: "/admin/community-trips", icon: UsersRound, feature: "community_trips" },
-  { name: "Packages", href: "/admin/packages", icon: Box, feature: "packages" },
-  { name: "Booking", href: "/admin/bookings", icon: Calendar, feature: "bookings" },
-  { name: "Trips", href: "/admin/trips", icon: Map, feature: "trips" },
-  { name: "Payments", href: "/admin/payments", icon: CreditCard, feature: "payments" },
-  { name: "Banner", href: "/admin/banner", icon: Image, feature: "banner" },
-  { 
-    name: "Coupon Code", 
-    icon: Ticket, 
-    feature: "coupon_code",
+
+  { name: "Users", href: "/admin/users", icon: Users, module: "users" },
+  { name: "Customers", href: "/admin/customers", icon: Users, module: "customers" },
+  { name: "Vendors", href: "/admin/vendors", icon: Users, module: "vendors" },
+  { name: "Roles & Permissions", href: "/admin/roles-permissions", icon: Shield, module: "roles_permissions" },
+  { name: "Explore Destination", href: "/admin/explore-destination", icon: MapPin, module: "explore_destination" },
+  { name: "Community Trips", href: "/admin/community-trips", icon: UsersRound, module: "community_trips" },
+  { name: "Packages", href: "/admin/packages", icon: Box, module: "packages" },
+  { name: "Bookings", href: "/admin/bookings", icon: Calendar, module: "bookings" },
+  { name: "Trips", href: "/admin/trips", icon: Map, module: "trips" },
+  { name: "Payments", href: "/admin/payments", icon: CreditCard, module: "payments" },
+  { name: "Banner", href: "/admin/banner", icon: Image, module: "banner" },
+
+  {
+    name: "Coupon Code",
+    icon: Ticket,
     subItems: [
-      { name: "Coupon Details", href: "/admin/coupon-code/details" },
-      { name: "Coupon Management", href: "/admin/coupon-code/management" }
-    ]
+      { name: "Coupon Details", href: "/admin/coupon-code/details", module: "coupon_details" },
+      { name: "Coupon Management", href: "/admin/coupon-code/management", module: "coupon_management" },
+    ],
   },
-  { 
-    name: "Promo Code", 
-    icon: Gift, 
-    feature: "promo_code",
+
+  {
+    name: "Promo Code",
+    icon: Gift,
     subItems: [
-      { name: "Promo Code Details", href: "/admin/promo-code/details" },
-      { name: "Promo Code Management", href: "/admin/promo-code/management" }
-    ]
+      { name: "Promo Details", href: "/admin/promo-code/details", module: "promo_details" },
+      { name: "Promo Management", href: "/admin/promo-code/management", module: "promo_management" },
+    ],
   },
-  { name: "Content", href: "/admin/content", icon: FileText, feature: "content" },
-  { name: "Notifications", href: "/admin/notifications", icon: Bell, feature: "notifications" },
-  { name: "Reports", href: "/admin/reports", icon: BarChart3, feature: "reports" },
-  { name: "Settings", href: "/admin/settings", icon: Settings, feature: "settings" },
+
+  { name: "Blog Posts", href: "/admin/content?tab=blog", icon: FileText, module: "blog_posts" },
+  { name: "Articles", href: "/admin/content?tab=articles", icon: FileText, module: "articles" },
+  { name: "Testimonials", href: "/admin/content?tab=testimonials", icon: FileText, module: "testimonials" },
+  { name: "FAQ", href: "/admin/content?tab=faqs", icon: FileText, module: "faq" },
+  { name: "Notifications", href: "/admin/notifications", icon: Bell, module: "notifications" },
+  { name: "Income", href: "/admin/reports?tab=income", icon: BarChart3, module: "income" },
+  { name: "Expense", href: "/admin/reports?tab=expense", icon: BarChart3, module: "expense" },
+  { name: "Trip Report", href: "/admin/reports?tab=trip", icon: BarChart3, module: "trip_report" },
+  { name: "Vendor Report", href: "/admin/reports?tab=vendors", icon: BarChart3, module: "vendor_report" },
+  { name: "Captains Report", href: "/admin/reports?tab=captains", icon: BarChart3, module: "captains_report" },
+  { name: "Settings", href: "/admin/settings", icon: Settings, module: "settings" },
 ]
+
+/* ---------------- COMPONENT ---------------- */
 
 export function AdminSidebar() {
   const pathname = usePathname()
-  const { user } = useAuth()
   const [openMenus, setOpenMenus] = useState<string[]>([])
 
-  const filteredNavigation = navigation.filter((item) => (user ? canAccessFeature(user.role, item.feature) : false))
 
-  const toggleMenu = (menuName: string) => {
-    setOpenMenus((prev) => 
-      prev.includes(menuName) 
-        ? prev.filter((name) => name !== menuName)
-        : [...prev, menuName]
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+
+  const canRead = (module?: string) => {
+    if (module === "dashboard") return true
+    return permissions.find((p) => p.module === module)?.read ?? false
+  }
+
+  const filteredNavigation = navigation
+    .map((item) => {
+      if (item.subItems) {
+        const subs = item.subItems.filter((s) => canRead(s.module))
+        return subs.length ? { ...item, subItems: subs } : null
+      }
+      return canRead(item.module) ? item : null
+    })
+    .filter(Boolean) as NavItem[]
+
+  const toggleMenu = (name: string) => {
+    setOpenMenus((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
     )
   }
 
-  const isSubItemActive = (subItems?: { name: string; href: string }[]) => {
-    if (!subItems) return false
-    return subItems.some((subItem) => pathname === subItem.href)
-  }
+  const isSubActive = (subs?: SubItem[]) =>
+    subs?.some((s) => s.href === pathname)
 
   return (
-    <div className="flex h-full w-64 flex-col bg-sidebar border-r border-sidebar-border">
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-        <Map className="h-6 w-6 text-sidebar-primary" />
-        <span className="font-semibold text-lg text-sidebar-foreground">TravelAdmin</span>
+    <aside className="flex h-full w-64 flex-col border-r bg-sidebar">
+      <div className="flex h-16 items-center gap-2 border-b px-6">
+        <Map className="h-6 w-6" />
+        <span className="text-lg font-semibold">TravelAdmin</span>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {filteredNavigation.map((item) => {
-          const isActive = pathname === item.href
-          const hasSubItems = item.subItems && item.subItems.length > 0
-          const isSubMenuOpen = openMenus.includes(item.name)
-          const isSubMenuActive = isSubItemActive(item.subItems)
+          const open = openMenus.includes(item.name)
+          const subActive = isSubActive(item.subItems)
 
-          if (hasSubItems) {
+          if (item.subItems) {
             return (
               <Collapsible
                 key={item.name}
-                open={isSubMenuOpen}
+                open={open}
                 onOpenChange={() => toggleMenu(item.name)}
               >
-                <CollapsibleTrigger
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    isSubMenuActive || isSubMenuOpen
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="h-5 w-5" />
-                    {item.name}
-                  </div>
-                  {isSubMenuOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
+                <CollapsibleTrigger asChild>
+                  <button
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium",
+                      open || subActive
+                        ? "bg-sidebar-accent"
+                        : "hover:bg-sidebar-accent"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="h-5 w-5" />
+                      {item.name}
+                    </div>
+                    {open ? <ChevronDown /> : <ChevronRight />}
+                  </button>
                 </CollapsibleTrigger>
+
                 <CollapsibleContent className="mt-1 space-y-1 pl-6">
-                  {item.subItems?.map((subItem) => {
-                    const isSubActive = pathname === subItem.href
-                    return (
-                      <Link
-                        key={subItem.href}
-                        href={subItem.href}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                          isSubActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        )}
-                      >
-                        {subItem.name}
-                      </Link>
-                    )
-                  })}
+                  {item.subItems.map((sub) => (
+                    <Link
+                      key={sub.href}
+                      href={sub.href}
+                      className={cn(
+                        "block rounded-lg px-3 py-2 text-sm",
+                        pathname === sub.href
+                          ? "bg-sidebar-accent"
+                          : "hover:bg-sidebar-accent"
+                      )}
+                    >
+                      {sub.name}
+                    </Link>
+                  ))}
                 </CollapsibleContent>
               </Collapsible>
             )
@@ -167,12 +201,12 @@ export function AdminSidebar() {
           return (
             <Link
               key={item.name}
-              href={item.href || "#"}
+              href={item.href!}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                pathname === item.href
+                  ? "bg-sidebar-accent"
+                  : "hover:bg-sidebar-accent"
               )}
             >
               <item.icon className="h-5 w-5" />
@@ -181,6 +215,6 @@ export function AdminSidebar() {
           )
         })}
       </nav>
-    </div>
+    </aside>
   )
 }

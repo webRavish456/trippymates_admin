@@ -141,7 +141,21 @@ export function PopularDestinationForm({ initialData, isEdit = false }: PopularD
         activities: initialData.activities || [],
         eventsFestivals: initialData.eventsFestivals || [],
       })
-      setImagePreviews(initialData.images || [])
+      
+      // Handle images properly to avoid duplicates
+      let imagesToSet: string[] = []
+      
+      if (initialData.images && Array.isArray(initialData.images) && initialData.images.length > 0) {
+        imagesToSet = initialData.images.filter((img: string) => 
+          img && typeof img === "string" && img.length > 0
+        )
+      } else if (initialData.image && typeof initialData.image === "string" && initialData.image.length > 0) {
+        imagesToSet = [initialData.image]
+      }
+      
+      // Remove duplicates
+      const uniqueImages = Array.from(new Set(imagesToSet))
+      setImagePreviews(uniqueImages)
     }
   }, [initialData, isEdit])
 
@@ -730,10 +744,25 @@ export function PopularDestinationForm({ initialData, isEdit = false }: PopularD
       formDataToSend.append("activities", JSON.stringify(formData.activities.map(({ imageFile, ...rest }) => rest)))
       formDataToSend.append("eventsFestivals", JSON.stringify(formData.eventsFestivals.map(({ imageFile, ...rest }) => rest)))
 
-      // Main images
-      imageFiles.forEach((file) => {
-        formDataToSend.append("images", file)
-      })
+      // Main images handling
+      const existingImageUrls = imagePreviews.filter((img: string) => 
+        typeof img === "string" && img.length > 0 && !img.startsWith("blob:")
+      )
+      
+      // Send existing image URLs as JSON array
+      if (existingImageUrls.length > 0) {
+        formDataToSend.append("images", JSON.stringify(existingImageUrls))
+      }
+      
+      // Send new uploaded files
+      if (imageFiles.length > 0) {
+        imageFiles.forEach((file) => {
+          formDataToSend.append("images", file)
+        })
+        formDataToSend.append("image", imageFiles[0])
+      } else if (existingImageUrls.length > 0) {
+        formDataToSend.append("image", existingImageUrls[0])
+      }
 
       // Attraction images
       formData.topAttractions.forEach((attraction: any) => {

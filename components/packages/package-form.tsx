@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Save, X, Plus, MapPin, Trash2, Search, DollarSign, CheckCircle2 } from "lucide-react"
+import { Save, X, Plus, MapPin, Trash2, Search, CheckCircle2, Pencil, ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -61,6 +61,32 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Package categories (Dynamic - fetched from backend)
+  const [packageCategories, setPackageCategories] = useState<Array<{ id: string; label: string; icon: string; description: string }>>([
+    { id: "adventure", label: "ADVENTURE", icon: "🏔️", description: "Trekking, Camping, Water Sports" },
+    { id: "family", label: "FAMILY", icon: "👨‍👩‍👧‍👦", description: "Family-friendly destinations" },
+    { id: "honeymoon", label: "HONEYMOON", icon: "💑", description: "Romantic getaways" },
+    { id: "holiday", label: "HOLIDAY", icon: "🏖️", description: "Vacation packages" },
+    { id: "cultural", label: "CULTURAL", icon: "🕌", description: "Heritage & Culture" },
+    { id: "religious", label: "RELIGIOUS", icon: "🙏", description: "Pilgrimage tours" },
+    { id: "wildlife", label: "WILDLIFE", icon: "🦁", description: "Safari & Nature" },
+    { id: "beach", label: "BEACH", icon: "🏖️", description: "Beach destinations" },
+    { id: "hill-station", label: "HILL STATION", icon: "⛰️", description: "Mountain retreats" },
+    { id: "weekend", label: "WEEKEND GETAWAYS", icon: "🎒", description: "Short trips" },
+  ])
+
+  // Category Management State
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<any>(null)
+  const [categoryForm, setCategoryForm] = useState({
+    label: "",
+    icon: "",
+    description: ""
+  })
+
+  // Active Tab State
+  const [activeTab, setActiveTab] = useState("category")
+
   // Package basic info
   const [formData, setFormData] = useState({
     title: "",
@@ -69,7 +95,7 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
     destination: "",
     overview: "",
     otherDetails: "",
-    category: "Other" as "Adventure" | "Family" | "Honeymoon" | "Holiday" | "Cultural" | "Religious" | "Wildlife" | "Beach" | "Hill Station" | "Other",
+    category: "" as string, // Adventure, Family, Honeymoon, etc.
     highlights: [] as string[],
     inclusions: [] as string[],
     exclusions: [] as string[],
@@ -93,6 +119,7 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
       validUntil: ""
     },
     status: "active" as "active" | "inactive",
+    isPopular: false,
     destinations: [] as SelectedDestination[],
     customization: {
       carRentals: {
@@ -146,7 +173,7 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
         destination: initialData.destination || "",
         overview: initialData.overview || "",
         otherDetails: initialData.otherDetails || "",
-        category: initialData.category || "Other",
+        category: initialData.category || "",
         highlights: initialData.highlights || [],
         inclusions: initialData.inclusions || [],
         exclusions: initialData.exclusions || [],
@@ -154,6 +181,7 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
         price: initialData.price || { adult: 0, child: 0, infant: 0, currency: "INR" },
         discount: initialData.discount || { percentage: 0, validFrom: "", validUntil: "" },
         status: initialData.status || "active",
+        isPopular: initialData.isPopular || false,
         destinations: initialData.destinations || [],
         customization: initialData.customization || {
           carRentals: { available: false, options: [] },
@@ -176,7 +204,52 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
 
   useEffect(() => {
     fetchAllDestinations()
+    fetchPackageCategories()
   }, [])
+
+  const fetchPackageCategories = async () => {
+    try {
+      // Check localStorage first
+      const savedCategories = localStorage.getItem('packageCategories')
+      if (savedCategories) {
+        setPackageCategories(JSON.parse(savedCategories))
+        return
+      }
+
+      // If not in localStorage, fetch from backend
+      const response = await fetch(`${PACKAGE_API_BASE}/categories`)
+      const result = await response.json()
+      if (result.status && result.data) {
+        // Map backend categories to form structure with icons and descriptions
+        const categoriesWithIcons = result.data.map((cat: any) => {
+          const defaultIcons: Record<string, string> = {
+            "adventure": "🏔️",
+            "family": "👨‍👩‍👧‍👦",
+            "honeymoon": "💑",
+            "holiday": "🏖️",
+            "cultural": "🕌",
+            "religious": "🙏",
+            "wildlife": "🦁",
+            "beach": "🏖️",
+            "hill-station": "⛰️",
+            "weekend": "🎒"
+          }
+          return {
+            id: cat.id,
+            label: cat.label.toUpperCase(),
+            icon: defaultIcons[cat.id] || "📦",
+            description: cat.label
+          }
+        })
+        setPackageCategories(categoriesWithIcons)
+        // Save to localStorage
+        localStorage.setItem('packageCategories', JSON.stringify(categoriesWithIcons))
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error)
+      // Keep default categories on error
+    }
+  }
 
   const fetchAllDestinations = async () => {
     try {
@@ -413,9 +486,172 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
     });
   }
 
+  // Category Management Functions
+  const openAddCategoryModal = () => {
+    setEditingCategory(null)
+    setCategoryForm({ label: "", icon: "", description: "" })
+    setIsCategoryModalOpen(true)
+  }
+
+  const openEditCategoryModal = (category: any) => {
+    setEditingCategory(category)
+    setCategoryForm({
+      label: category.label,
+      icon: category.icon,
+      description: category.description
+    })
+    setIsCategoryModalOpen(true)
+  }
+
+  const handleSaveCategory = () => {
+    if (!categoryForm.label || !categoryForm.icon) {
+      toast({
+        title: "Error",
+        description: "Please fill in category name and icon",
+        variant: "destructive"
+      })
+      return
+    }
+
+    let updatedCategories
+    if (editingCategory) {
+      // Edit existing category
+      updatedCategories = packageCategories.map(cat => 
+        cat.id === editingCategory.id 
+          ? { ...cat, label: categoryForm.label, icon: categoryForm.icon, description: categoryForm.description }
+          : cat
+      )
+      toast({
+        title: "Success",
+        description: "Category updated successfully"
+      })
+    } else {
+      // Add new category
+      const newId = categoryForm.label.toLowerCase().replace(/\s+/g, '-')
+      updatedCategories = [...packageCategories, {
+        id: newId,
+        label: categoryForm.label,
+        icon: categoryForm.icon,
+        description: categoryForm.description
+      }]
+      toast({
+        title: "Success",
+        description: "Category added successfully"
+      })
+    }
+
+    setPackageCategories(updatedCategories)
+    // Save to localStorage
+    localStorage.setItem('packageCategories', JSON.stringify(updatedCategories))
+
+    setIsCategoryModalOpen(false)
+    setCategoryForm({ label: "", icon: "", description: "" })
+    setEditingCategory(null)
+  }
+
+  const handleDeleteCategory = (categoryId: string) => {
+    if (confirm("Are you sure you want to delete this category?")) {
+      const updatedCategories = packageCategories.filter(cat => cat.id !== categoryId)
+      setPackageCategories(updatedCategories)
+      // Save to localStorage
+      localStorage.setItem('packageCategories', JSON.stringify(updatedCategories))
+      
+      // If the deleted category was selected, clear selection
+      if (formData.category === categoryId) {
+        setFormData({ ...formData, category: "" })
+      }
+      toast({
+        title: "Success",
+        description: "Category deleted successfully"
+      })
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isEdit) return // Prevent submission in view mode
+
+    // Validation before submission
+    const missingFields: string[] = []
+
+    // Category validation
+    if (!formData.category) {
+      missingFields.push("❌ Package Category")
+    }
+
+    // Destinations validation
+    if (formData.destinations.length === 0) {
+      missingFields.push("❌ At least one Destination")
+    }
+
+    // Basic Info validation
+    if (!formData.title.trim()) {
+      missingFields.push("❌ Package Name")
+    }
+    if (!formData.source.trim()) {
+      missingFields.push("❌ Source City")
+    }
+    if (!formData.destination.trim()) {
+      missingFields.push("❌ Destination City")
+    }
+    if (!formData.duration.trim()) {
+      missingFields.push("❌ Duration")
+    }
+    if (!formData.overview.trim()) {
+      missingFields.push("❌ Overview")
+    }
+    if (formData.price.adult <= 0) {
+      missingFields.push("❌ Adult Price (must be greater than 0)")
+    }
+
+    // Itinerary validation
+    if (formData.itinerary.length === 0) {
+      missingFields.push("❌ At least one Itinerary item")
+    } else {
+      const invalidItinerary = formData.itinerary.some(item => 
+        !item.day || !item.title.trim() || !item.description.trim()
+      )
+      if (invalidItinerary) {
+        missingFields.push("❌ Complete all Itinerary fields (Day, Title, Description)")
+      }
+    }
+
+    // Details validation
+    if (formData.highlights.length === 0) {
+      missingFields.push("❌ At least one Highlight")
+    }
+    if (formData.inclusions.length === 0) {
+      missingFields.push("❌ At least one Inclusion")
+    }
+    if (formData.exclusions.length === 0) {
+      missingFields.push("❌ At least one Exclusion")
+    }
+
+    // Images validation
+    if (imagePreviews.length === 0 && imageFiles.length === 0) {
+      missingFields.push("❌ At least one Package Image")
+    }
+
+    // If there are missing fields, show toast and return
+    if (missingFields.length > 0) {
+      toast({
+        title: "❗ Required Fields Missing",
+        description: (
+          <div className="mt-2">
+            <p className="font-semibold mb-2">Please complete the following:</p>
+            <ul className="list-none space-y-1">
+              {missingFields.map((field) => (
+                <li key={field} className="text-sm">{field}</li>
+              ))}
+            </ul>
+          </div>
+        ),
+        variant: "destructive",
+        duration: 8000,
+      })
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -436,6 +672,7 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
       formDataToSend.append("price", JSON.stringify(formData.price))
       formDataToSend.append("discount", JSON.stringify(formData.discount))
       formDataToSend.append("status", formData.status)
+      formDataToSend.append("isPopular", formData.isPopular.toString())
       formDataToSend.append("destinations", JSON.stringify(formData.destinations))
       formDataToSend.append("customization", JSON.stringify(formData.customization))
 
@@ -484,12 +721,55 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
     }
   }
 
+  // Validation Functions for Each Tab
+  const isCategoryValid = () => {
+    return formData.category !== ""
+  }
+
+  const isDestinationsValid = () => {
+    return formData.destinations.length > 0
+  }
+
+  const isBasicInfoValid = () => {
+    return (
+      formData.title.trim() !== "" &&
+      formData.source.trim() !== "" &&
+      formData.destination.trim() !== "" &&
+      formData.duration.trim() !== "" &&
+      formData.overview.trim() !== "" &&
+      formData.price.adult > 0
+    )
+  }
+
+  const isItineraryValid = () => {
+    return formData.itinerary.length > 0 && formData.itinerary.every(item => 
+      item.day && item.title.trim() !== "" && item.description.trim() !== ""
+    )
+  }
+
+  const isDetailsValid = () => {
+    return (
+      formData.highlights.length > 0 &&
+      formData.inclusions.length > 0 &&
+      formData.exclusions.length > 0
+    )
+  }
+
+  const isCustomizationValid = () => {
+    return true // Optional tab, always valid
+  }
+
+  const isImagesValid = () => {
+    return imagePreviews.length > 0 || imageFiles.length > 0
+  }
+
   return (
     <Card>
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Tabs defaultValue="destinations" className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-7">
+              <TabsTrigger value="category">Category</TabsTrigger>
               <TabsTrigger value="destinations">Destinations</TabsTrigger>
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
@@ -498,11 +778,138 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
               <TabsTrigger value="images">Images</TabsTrigger>
             </TabsList>
 
+            {/* Category Selection Tab - STEP 1 */}
+            <TabsContent value="category" className="space-y-6 mt-4">
+              <div className="space-y-6">
+                {/* Package Category Selection */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">Select Package Category *</h3>
+                      <p className="text-sm text-muted-foreground">Choose the main category for your package</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={openAddCategoryModal}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Package Category
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {packageCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          if (isEdit) {
+                            setFormData({ ...formData, category: cat.id })
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (isEdit && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault()
+                            setFormData({ ...formData, category: cat.id })
+                          }
+                        }}
+                        disabled={!isEdit}
+                        className={`relative p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                          formData.category === cat.id
+                            ? "border-blue-500 bg-blue-50 shadow-md"
+                            : "border-gray-200 hover:border-blue-300 bg-white"
+                        } ${!isEdit ? "opacity-60 cursor-not-allowed" : "hover:shadow-lg"}`}
+                      >
+                        {/* Edit and Delete Icons - Top Right */}
+                        <div className="absolute top-2 right-2 flex gap-1 z-10">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openEditCategoryModal(cat)
+                            }}
+                            className="p-1.5 bg-white hover:bg-gray-50 text-blue-600 rounded-md transition-all shadow-md hover:shadow-lg"
+                            title="Edit Category"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteCategory(cat.id)
+                            }}
+                            className="p-1.5 bg-white hover:bg-gray-50 text-red-600 rounded-md transition-all shadow-md hover:shadow-lg"
+                            title="Delete Category"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Category Card Content */}
+                        <div className="w-full text-center">
+                          <div className="text-3xl mb-2">{cat.icon}</div>
+                          <div className="font-semibold text-sm mb-1">{cat.label}</div>
+                          <div className="text-xs text-muted-foreground">{cat.description}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Next Button - Bottom Right */}
+                {isEdit && (
+                  <div className="flex justify-end mt-6">
+                    <Button 
+                      type="button" 
+                      size="lg"
+                      onClick={() => setActiveTab("destinations")}
+                      disabled={!isCategoryValid()}
+                    >
+                      Next: Select Destinations →
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
             {/* Basic Info Tab */}
             <TabsContent value="basic" className="space-y-4 mt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Package Name *</Label>
+              {!formData.category || formData.destinations.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
+                        <CheckCircle2 className="h-8 w-8 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Complete Previous Steps First</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {!formData.category 
+                            ? "Please select a package category from the Category tab"
+                            : "Please add at least one destination from the Destinations tab"}
+                        </p>
+                        <Button 
+                          variant="default"
+                          onClick={() => {
+                            const targetTab = !formData.category ? "category" : "destinations"
+                            setActiveTab(targetTab)
+                          }}
+                        >
+                          {!formData.category ? "Go to Category →" : "Go to Destinations →"}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Package Name *</Label>
                   <Input
                     id="title"
                     value={formData.title}
@@ -548,28 +955,6 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
                     disabled={!isEdit}
                     readOnly={!isEdit}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Package Category *</Label>
-                  <select
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full px-3 py-2 border rounded-md"
-                    required
-                    disabled={!isEdit}
-                  >
-                    <option value="Adventure">Adventure</option>
-                    <option value="Family">Family</option>
-                    <option value="Honeymoon">Honeymoon</option>
-                    <option value="Holiday">Holiday</option>
-                    <option value="Cultural">Cultural</option>
-                    <option value="Religious">Religious</option>
-                    <option value="Wildlife">Wildlife</option>
-                    <option value="Beach">Beach</option>
-                    <option value="Hill Station">Hill Station</option>
-                    <option value="Other">Other</option>
-                  </select>
                 </div>
               </div>
 
@@ -635,18 +1020,40 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
                 </div>
               </div>
 
+              {/* Popular Package Checkbox */}
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="isPopular"
+                  checked={formData.isPopular}
+                  onChange={(e) => setFormData({ ...formData, isPopular: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                  disabled={!isEdit}
+                />
+                <Label 
+                  htmlFor="isPopular" 
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Mark as Popular Package
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-7">
+                Popular packages will be highlighted and shown at the top of listings
+              </p>
+                </>
+              )}
+
+              {/* Next Button - Basic Info Tab */}
               {isEdit && (
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <select
-                    id="status"
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as "active" | "inactive" })}
-                    className="w-full px-3 py-2 border rounded-md"
+                <div className="flex justify-end mt-6 pt-4 border-t">
+                  <Button 
+                    type="button" 
+                    size="lg"
+                    onClick={() => setActiveTab("itinerary")}
+                    disabled={!isBasicInfoValid()}
                   >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
+                    Next: Itinerary →
+                  </Button>
                 </div>
               )}
             </TabsContent>
@@ -654,8 +1061,30 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
             {/* Destinations Tab */}
             <TabsContent value="destinations" className="space-y-4 mt-4">
               <div className="space-y-4">
-                {/* View Mode - Show selected destinations in explore destination style */}
-                {!isEdit && formData.destinations.length > 0 ? (
+                {/* Check if category is selected first */}
+                {!formData.category && isEdit ? (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="h-16 w-16 rounded-full bg-yellow-100 flex items-center justify-center">
+                          <MapPin className="h-8 w-8 text-yellow-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Select Package Category First</h3>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Please go to "Category" tab and select a category before adding destinations
+                          </p>
+                          <Button 
+                            variant="default"
+                            onClick={() => setActiveTab("category")}
+                          >
+                            Go to Category →
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : !isEdit && formData.destinations.length > 0 ? (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Selected Destinations</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -765,17 +1194,14 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
                     {/* Destination List for Selected Type */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Button
+                        <button
                           type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedDestinationType(null)
-                            setDestinationSearch("")
-                          }}
+                          onClick={() => setSelectedDestinationType(null)}
+                          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                          title="Back to destination types"
                         >
-                          ← Back to Types
-                        </Button>
+                          <ArrowLeft className="h-5 w-5" />
+                        </button>
                         <div>
                           <h3 className="text-lg font-semibold">
                             {destinationTypes.find(t => t.type === selectedDestinationType)?.label || "Destinations"}
@@ -1065,6 +1491,20 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
                   </>
                 )}
               </div>
+
+              {/* Next Button - Destinations Tab */}
+              {isEdit && (
+                <div className="flex justify-end mt-6 pt-4 border-t">
+                  <Button 
+                    type="button" 
+                    size="lg"
+                    onClick={() => setActiveTab("basic")}
+                    disabled={!isDestinationsValid()}
+                  >
+                    Next: Basic Info →
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             {/* Itinerary Tab */}
@@ -1232,6 +1672,20 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
                   )}
                 </div>
               </div>
+
+              {/* Next Button - Itinerary Tab */}
+              {isEdit && (
+                <div className="flex justify-end mt-6 pt-4 border-t">
+                  <Button 
+                    type="button" 
+                    size="lg"
+                    onClick={() => setActiveTab("details")}
+                    disabled={!isItineraryValid()}
+                  >
+                    Next: Details →
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             {/* Details Tab */}
@@ -1394,6 +1848,20 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
                   />
                 </div>
               </div>
+
+              {/* Next Button - Details Tab */}
+              {isEdit && (
+                <div className="flex justify-end mt-6 pt-4 border-t">
+                  <Button 
+                    type="button" 
+                    size="lg"
+                    onClick={() => setActiveTab("customization")}
+                    disabled={!isDetailsValid()}
+                  >
+                    Next: Customization →
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             {/* Customization Tab */}
@@ -1837,6 +2305,20 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
                   )}
                 </Card>
               </div>
+
+              {/* Next Button - Customization Tab */}
+              {isEdit && (
+                <div className="flex justify-end mt-6 pt-4 border-t">
+                  <Button 
+                    type="button" 
+                    size="lg"
+                    onClick={() => setActiveTab("images")}
+                    disabled={!isCustomizationValid()}
+                  >
+                    Next: Images →
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             {/* Images Tab */}
@@ -1876,31 +2358,98 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
                 </div>
               )}
 
-              {/* Action Buttons */}
+              {/* Add Package Button - Images Tab (Final) */}
               {isEdit && (
-                <div className="flex justify-end gap-4 pt-6 border-t mt-6">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {isEdit ? "Updating..." : "Adding..."}
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  {isEdit ? "Update Package" : "Add Package"}
-                </>
-              )}
-            </Button>
-          </div>
+                <div className="flex justify-end mt-6 pt-4 border-t">
+                  <Button 
+                    type="submit" 
+                    size="lg"
+                    disabled={isSubmitting || !isImagesValid()}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        {initialData ? "Updating..." : "Adding..."}
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        {initialData ? "Update Package" : "Add Package"}
+                      </>
+                    )}
+                  </Button>
+                </div>
               )}
             </TabsContent>
           </Tabs>
         </form>
       </CardContent>
+
+      {/* Category Management Modal */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>{editingCategory ? "Edit Category" : "Add New Category"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="categoryLabel">Category Name *</Label>
+                <Input
+                  id="categoryLabel"
+                  value={categoryForm.label}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, label: e.target.value })}
+                  placeholder="e.g., ADVENTURE, HONEYMOON"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="categoryIcon">Category Icon (Emoji) *</Label>
+                <Input
+                  id="categoryIcon"
+                  value={categoryForm.icon}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
+                  placeholder="e.g., 🏔️, 💑, 🏖️"
+                  className="text-2xl"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use an emoji that represents your category
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="categoryDescription">Description</Label>
+                <Input
+                  id="categoryDescription"
+                  value={categoryForm.description}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  placeholder="e.g., Trekking, Camping, Water Sports"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsCategoryModalOpen(false)
+                    setCategoryForm({ label: "", icon: "", description: "" })
+                    setEditingCategory(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSaveCategory}
+                >
+                  {editingCategory ? "Update Category" : "Add Category"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </Card>
   )
 }

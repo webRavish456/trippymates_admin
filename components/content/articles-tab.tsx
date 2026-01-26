@@ -12,6 +12,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import { CardSkeleton } from "@/components/ui/skeletons"
+import { RootState } from "../redux/store"
+import { useSelector } from "react-redux"
 
 interface Article {
   _id: string
@@ -30,7 +33,27 @@ interface Article {
   featured?: boolean
 }
 
+type ArticlesPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+type Permission = {
+  module: string;
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
 export function ArticlesTab() {
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+  const [hasPermission, setHasPermission] = useState<ArticlesPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })
+ 
   const [articles, setArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -60,6 +83,17 @@ export function ArticlesTab() {
   useEffect(() => {
     fetchArticles()
   }, [currentPage, searchQuery])
+
+  useEffect(() => {
+    const articlesPermission = permissions.find(
+      (p: Permission) => p.module === "content"
+    )
+    setHasPermission({
+      create: articlesPermission?.create ?? false,
+      update: articlesPermission?.update ?? false,
+      delete: articlesPermission?.delete ?? false,
+    })
+  }, [])
 
   const fetchArticles = async () => {
     try {
@@ -320,13 +354,13 @@ export function ArticlesTab() {
             Manage article posts for middle section
           </p>
         </div>
-        <Button onClick={() => {
+        {hasPermission.create && <Button onClick={() => {
           resetForm()
           setIsAddDialogOpen(true)
         }}>
           <Plus className="h-4 w-4 mr-2" />
           Add Article
-        </Button>
+        </Button>}  
       </div>
 
       <Card>
@@ -346,7 +380,11 @@ export function ArticlesTab() {
       </Card>
 
       {loading ? (
-        <div className="text-center py-8">Loading articles...</div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <CardSkeleton key={`article-skeleton-${index}`} />
+          ))}
+        </div>
       ) : articles.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -409,12 +447,12 @@ export function ArticlesTab() {
                           <Button variant="ghost" size="sm" onClick={() => openViewDialog(article)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(article)}>
+                          {hasPermission.update && <Button variant="ghost" size="sm" onClick={() => openEditDialog(article)}>
                             <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteArticle(article._id)}>
+                          </Button>}
+                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteArticle(article._id)}>
                             <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                          </Button>}
                         </div>
                       </td>
                     </tr>

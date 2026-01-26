@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, MapPin, Calendar, Users, Eye, Package, Building2 } from "lucide-react"
+import { Search, MapPin, Calendar, Users, Eye, Building2Icon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import moment from "moment-timezone"
+
 
 import { API_BASE_URL as CONFIG_API_BASE_URL } from "@/lib/config"
 const API_BASE_URL = `${CONFIG_API_BASE_URL}/api/admin/trip`
@@ -72,7 +72,7 @@ interface Trip {
 
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
@@ -88,22 +88,12 @@ export default function TripsPage() {
         }
       })
       const data = await response.json()
-      if (data.status && data.data) {
-        setTrips(data.data)
-      } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to fetch trips",
-          variant: "destructive",
-        })
+      if (data.status) {
+        setTrips(data.data || [])
       }
     } catch (error) {
       console.error("Error fetching trips:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch trips",
-        variant: "destructive",
-      })
+      setTrips([])
     } finally {
       setLoading(false)
     }
@@ -126,18 +116,6 @@ export default function TripsPage() {
     setIsDetailsOpen(true)
   }
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A"
-    return moment(dateString).tz("Asia/Kolkata").format("DD MMM YYYY")
-  }
-
-  const stats = {
-    totalTrips: trips.length,
-    totalParticipants: trips.reduce((sum, trip) => sum + trip.totalParticipants, 0),
-    totalSlots: trips.reduce((sum, trip) => sum + trip.totalSlots, 0),
-    totalCapacity: trips.reduce((sum, trip) => sum + trip.totalCapacity, 0),
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -156,51 +134,6 @@ export default function TripsPage() {
         <p className="text-muted-foreground">View active trips with slot details and participant information</p>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalTrips}</div>
-            <p className="text-xs text-muted-foreground">Active upcoming trips</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Participants</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalParticipants}</div>
-            <p className="text-xs text-muted-foreground">Travelers booked</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Slots</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalSlots}</div>
-            <p className="text-xs text-muted-foreground">Active slots</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Capacity</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCapacity}</div>
-            <p className="text-xs text-muted-foreground">Maximum travelers</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search Filter */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex gap-4">
@@ -217,7 +150,6 @@ export default function TripsPage() {
         </CardContent>
       </Card>
 
-      {/* Trips Table */}
       <Card>
         <CardContent className="pt-6">
           {filteredTrips.length === 0 ? (
@@ -265,7 +197,7 @@ export default function TripsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Building2 className="h-3 w-3 text-muted-foreground" />
+                        <Building2Icon className="h-3 w-3 text-muted-foreground" />
                         <span className="font-medium">{trip.totalSlots}</span>
                       </div>
                     </TableCell>
@@ -291,7 +223,6 @@ export default function TripsPage() {
         </CardContent>
       </Card>
 
-      {/* Trip Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -299,7 +230,6 @@ export default function TripsPage() {
           </DialogHeader>
           {selectedTrip && (
             <div className="space-y-6">
-              {/* Package & Destination Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Package Name</p>
@@ -329,7 +259,6 @@ export default function TripsPage() {
 
               <Separator />
 
-              {/* Summary Statistics */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">Total Slots</p>
@@ -347,7 +276,6 @@ export default function TripsPage() {
 
               <Separator />
 
-              {/* Slots Details */}
               <div>
                 <h3 className="font-semibold mb-3">Slot Details</h3>
                 <div className="space-y-4">
@@ -386,7 +314,6 @@ export default function TripsPage() {
                           </div>
                         </div>
 
-                        {/* Bookings in this slot */}
                         {slot.bookings.length > 0 && (
                           <div>
                             <p className="text-sm font-medium mb-2">Bookings in this slot:</p>

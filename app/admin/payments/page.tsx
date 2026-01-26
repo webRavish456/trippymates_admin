@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InvoiceDialog } from "@/components/invoice-dialog"
 import { useToast } from "@/hooks/use-toast"
 import moment from "moment-timezone"
+import { TableRowSkeleton } from "@/components/ui/skeletons"
 
 import { API_BASE_URL as CONFIG_API_BASE_URL } from "@/lib/config"
 const API_BASE_URL = `${CONFIG_API_BASE_URL}/api/admin/payments`
@@ -171,11 +172,36 @@ export default function PaymentsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading payments...</p>
+      <div className="space-y-6 p-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-balance">Payments & Invoices</h1>
+          <p className="text-muted-foreground">Track payments and manage invoices</p>
         </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Booking ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Package</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Payment Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 8 }).map((_, index) => (
+                    <TableRowSkeleton key={`payment-skeleton-${index}`} columns={8} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }

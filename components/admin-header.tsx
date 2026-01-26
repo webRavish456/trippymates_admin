@@ -22,6 +22,8 @@ export function AdminHeader() {
 
   console.log("dropdownOpen", dropdownOpen)
 
+  console.log("user", user)
+
   const handleDropdownOpen = () => {
     setDropdownOpen(!dropdownOpen)
   }
@@ -57,7 +59,13 @@ export function AdminHeader() {
                   {user?.name?.charAt(0)?.toUpperCase() || "A"}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium capitalize">{user?.role?.replace("_", " ") || "Admin"}</span>
+              <span className="text-sm font-medium">
+                {user?.role 
+                  ? String(user.role).split(" ").map(word => 
+                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                    ).join(" ")
+                  : "Admin"}
+              </span>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>

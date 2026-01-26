@@ -16,6 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 interface PlaceDetail {
   placeName: string
+  location: string
   description: string
   weatherInfo: string
   images: string[]
@@ -62,12 +63,22 @@ export function CultureHeritageForm({ initialData, isEdit = false }: CultureHeri
         status: initialData.status || "active",
         placesDetails: initialData.placesDetails || [],
       })
-      // Handle both single image and multiple images
-      if (initialData.images && Array.isArray(initialData.images)) {
-        setImagePreviews(initialData.images)
-      } else if (initialData.image) {
-        setImagePreviews([initialData.image])
+      
+      // Handle images properly to avoid duplicates
+      let imagesToSet: string[] = []
+      
+      if (initialData.images && Array.isArray(initialData.images) && initialData.images.length > 0) {
+        imagesToSet = initialData.images.filter((img: string) => 
+          img && typeof img === "string" && img.length > 0
+        )
+      } else if (initialData.image && typeof initialData.image === "string" && initialData.image.length > 0) {
+        imagesToSet = [initialData.image]
       }
+      
+      // Remove duplicates
+      const uniqueImages = Array.from(new Set(imagesToSet))
+      setImagePreviews(uniqueImages)
+      
       if (initialData.placesDetails?.length > 0) {
         setExpandedPlaces(new Set([0]))
       }
@@ -84,15 +95,24 @@ export function CultureHeritageForm({ initialData, isEdit = false }: CultureHeri
   }
 
   const removeImage = (index: number) => {
-    // Check if it's a new file or existing image
-    const existingImagesCount = initialData?.images?.length || (initialData?.image ? 1 : 0)
-    if (index < existingImagesCount) {
-      // It's an existing image - remove from previews only
+    // Check if it's a new file or existing image by checking if it's a blob URL
+    const preview = imagePreviews[index]
+    const isBlobUrl = preview && typeof preview === "string" && preview.startsWith("blob:")
+    
+    if (isBlobUrl) {
+      // It's a new file (blob URL) - remove from both files and previews
+      // Count how many blob URLs come before this index
+      let blobCount = 0
+      for (let i = 0; i < index; i++) {
+        if (imagePreviews[i] && typeof imagePreviews[i] === "string" && imagePreviews[i].startsWith("blob:")) {
+          blobCount++
+        }
+      }
+      const fileIndex = blobCount
+      setImageFiles(imageFiles.filter((_, i) => i !== fileIndex))
       setImagePreviews(imagePreviews.filter((_, i) => i !== index))
     } else {
-      // It's a new file - remove from both files and previews
-      const fileIndex = index - existingImagesCount
-      setImageFiles(imageFiles.filter((_, i) => i !== fileIndex))
+      // It's an existing image (real URL) - remove from previews only
       setImagePreviews(imagePreviews.filter((_, i) => i !== index))
     }
   }
@@ -100,6 +120,7 @@ export function CultureHeritageForm({ initialData, isEdit = false }: CultureHeri
   const addPlace = () => {
     const newPlace: PlaceDetail = {
       placeName: "",
+      location: "",
       description: "",
       weatherInfo: "",
       images: [],
@@ -159,6 +180,13 @@ export function CultureHeritageForm({ initialData, isEdit = false }: CultureHeri
         // Remove placeImageFiles (will be sent separately)
         delete cleanPlace.placeImageFiles
         
+        // Filter out blob URLs from images array (keep only real URLs from backend)
+        if (cleanPlace.images && Array.isArray(cleanPlace.images)) {
+          cleanPlace.images = cleanPlace.images.filter((img: string) => 
+            typeof img === "string" && img.length > 0 && !img.startsWith("blob:")
+          )
+        }
+        
         // Remove imageFile from each array and collect them separately
         if (cleanPlace.topAttractions) {
           cleanPlace.topAttractions = cleanPlace.topAttractions.map((item: any) => {
@@ -203,25 +231,34 @@ export function CultureHeritageForm({ initialData, isEdit = false }: CultureHeri
       // Add placesDetails as JSON (without imageFile properties)
       formDataToSend.append("placesDetails", JSON.stringify(placesDetailsForJSON))
 
-      // Main images - append as "image" for first image and "images" for all
+      // Main images handling
+      const existingImageUrls = imagePreviews.filter((img: string) => 
+        typeof img === "string" && img.length > 0 && !img.startsWith("blob:")
+      )
+      
+      // Send existing image URLs as JSON array
+      if (existingImageUrls.length > 0) {
+        formDataToSend.append("images", JSON.stringify(existingImageUrls))
+      }
+      
+      // Send new uploaded files
       if (imageFiles.length > 0) {
-        imageFiles.forEach((file, index) => {
-          if (index === 0) {
-            formDataToSend.append("image", file)
-          }
+        imageFiles.forEach((file) => {
           formDataToSend.append("images", file)
         })
-      } else if (isEdit && initialData?.image && imageFiles.length === 0) {
-        formDataToSend.append("image", initialData.image)
+        formDataToSend.append("image", imageFiles[0])
+      } else if (existingImageUrls.length > 0) {
+        formDataToSend.append("image", existingImageUrls[0])
       }
 
       // Extract and send images from placesDetails
+      // IMPORTANT: Send placeDetails images with "placeImages" key to avoid mixing with main category images
       formData.placesDetails.forEach((place, placeIndex) => {
-        // Place images (multiple images per place)
+        // Place images (multiple images per place) - send with separate "placeImages" key
         if ((place as any).placeImageFiles && Array.isArray((place as any).placeImageFiles)) {
           (place as any).placeImageFiles.forEach((file: File) => {
             if (file instanceof File) {
-              formDataToSend.append("images", file)
+              formDataToSend.append("placeImages", file) // Use separate key to avoid mixing
             }
           })
         }
@@ -517,29 +554,39 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, removePlace }: 
   }
 
   const removePlaceImage = (index: number) => {
-    // Check if it's a new file or existing image
-    const existingImagesCount = (place.images?.length || 0)
-    if (index < existingImagesCount) {
-      // It's an existing image - remove from localPlace
-      const updatedImages = localPlace.images.filter((_, i) => i !== index)
-      updateField("images", updatedImages)
-      const updatedPreviews = placeImagePreviews.filter((_, i) => i !== index)
-      setPlaceImagePreviews(updatedPreviews)
-    } else {
-      // It's a new file - remove from placeImageFiles
-      const fileIndex = index - existingImagesCount
+    const preview = placeImagePreviews[index]
+    if (!preview) return
+    
+    const isBlobUrl = typeof preview === "string" && preview.startsWith("blob:")
+    
+    // Remove from previews
+    const updatedPreviews = placeImagePreviews.filter((_, i) => i !== index)
+    setPlaceImagePreviews(updatedPreviews)
+    
+    if (isBlobUrl) {
+      // It's a new file (blob URL) - remove from files array
+      // Count how many blob URLs come before this index
+      let blobCount = 0
+      for (let i = 0; i < index; i++) {
+        if (placeImagePreviews[i] && typeof placeImagePreviews[i] === "string" && placeImagePreviews[i].startsWith("blob:")) {
+          blobCount++
+        }
+      }
+      const fileIndex = blobCount
       const updatedFiles = placeImageFiles.filter((_, i) => i !== fileIndex)
       setPlaceImageFiles(updatedFiles)
-      const updatedPreviews = placeImagePreviews.filter((_, i) => i !== index)
-      setPlaceImagePreviews(updatedPreviews)
-      // Remove from localPlace placeImageFiles
-      const updatedPlace: any = { ...localPlace }
-      if (updatedPlace.placeImageFiles) {
-        updatedPlace.placeImageFiles = updatedPlace.placeImageFiles.filter((_: any, i: number) => i !== fileIndex)
-      }
-      setLocalPlace(updatedPlace)
-      // Also remove from localPlace images array
-      const updatedImages = localPlace.images.filter((_, i) => i !== index)
+      
+      // Update localPlace.images - use updatedPreviews to filter, which already has the removed blob URL excluded
+      // This ensures we only remove the specific blob URL that was clicked, not all blob URLs
+      const updatedImages = updatedPreviews.filter((img: string) => 
+        typeof img === "string" && !img.startsWith("blob:")
+      )
+      updateField("images", updatedImages)
+    } else {
+      // It's an existing image (real URL) - just remove it from images array
+      const updatedImages = updatedPreviews.filter((img: string) => 
+        typeof img === "string" && !img.startsWith("blob:")
+      )
       updateField("images", updatedImages)
     }
   }
@@ -769,6 +816,14 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, removePlace }: 
             value={localPlace.placeName}
             onChange={(e) => updateField("placeName", e.target.value)}
             placeholder="e.g., Taj Mahal, Red Fort, Hampi, Khajuraho"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <Input
+            value={localPlace.location || ""}
+            onChange={(e) => updateField("location", e.target.value)}
+            placeholder="e.g., Agra, Uttar Pradesh"
           />
         </div>
       </div>

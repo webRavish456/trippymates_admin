@@ -16,6 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 interface PlaceDetail {
   placeName: string
+  location: string
   description: string
   weatherInfo: string
   images: string[]
@@ -79,12 +80,25 @@ export function CategoryDestinationForm({ initialData, isEdit = false }: Categor
         status: initialData.status || "active",
         placesDetails: initialData.placesDetails || [],
       })
-      // Handle both single image and multiple images
-      if (initialData.images && Array.isArray(initialData.images)) {
-        setImagePreviews(initialData.images)
-      } else if (initialData.image) {
-        setImagePreviews([initialData.image])
+      
+      // Handle images properly to avoid duplicates
+      // Priority: images array > single image field
+      let imagesToSet: string[] = []
+      
+      if (initialData.images && Array.isArray(initialData.images) && initialData.images.length > 0) {
+        // Use images array (filter out any empty strings or invalid URLs)
+        imagesToSet = initialData.images.filter((img: string) => 
+          img && typeof img === "string" && img.length > 0
+        )
+      } else if (initialData.image && typeof initialData.image === "string" && initialData.image.length > 0) {
+        // Fallback to single image field only if images array is empty
+        imagesToSet = [initialData.image]
       }
+      
+      // Remove duplicates (in case backend sent duplicates)
+      const uniqueImages = Array.from(new Set(imagesToSet))
+      setImagePreviews(uniqueImages)
+      
       if (initialData.placesDetails?.length > 0) {
         setExpandedPlaces(new Set([0]))
       }
@@ -101,15 +115,27 @@ export function CategoryDestinationForm({ initialData, isEdit = false }: Categor
   }
 
   const removeImage = (index: number) => {
-    // Check if it's a new file or existing image
-    const existingImagesCount = initialData?.images?.length || (initialData?.image ? 1 : 0)
-    if (index < existingImagesCount) {
-      // It's an existing image - remove from previews only
+    // Check if it's a new file or existing image by checking if it's a blob URL
+    const preview = imagePreviews[index]
+    const isBlobUrl = preview && typeof preview === "string" && preview.startsWith("blob:")
+    
+    if (isBlobUrl) {
+      // It's a new file (blob URL) - remove from both files and previews
+      const blobUrlIndex = imagePreviews.findIndex((img: string, i: number) => 
+        i >= index && img && typeof img === "string" && img.startsWith("blob:")
+      )
+      // Count how many blob URLs come before this index
+      let blobCount = 0
+      for (let i = 0; i < index; i++) {
+        if (imagePreviews[i] && typeof imagePreviews[i] === "string" && imagePreviews[i].startsWith("blob:")) {
+          blobCount++
+        }
+      }
+      const fileIndex = blobCount
+      setImageFiles(imageFiles.filter((_, i) => i !== fileIndex))
       setImagePreviews(imagePreviews.filter((_, i) => i !== index))
     } else {
-      // It's a new file - remove from both files and previews
-      const fileIndex = index - existingImagesCount
-      setImageFiles(imageFiles.filter((_, i) => i !== fileIndex))
+      // It's an existing image - remove from previews only
       setImagePreviews(imagePreviews.filter((_, i) => i !== index))
     }
   }
@@ -117,6 +143,7 @@ export function CategoryDestinationForm({ initialData, isEdit = false }: Categor
   const addPlace = () => {
     const newPlace: PlaceDetail = {
       placeName: "",
+      location: "",
       description: "",
       weatherInfo: "",
       images: [],
@@ -175,11 +202,23 @@ export function CategoryDestinationForm({ initialData, isEdit = false }: Categor
       formDataToSend.append("status", formData.status)
 
       // Extract imageFiles from placesDetails before stringifying
+      // IMPORTANT: Preserve existing placeDetails image URLs in JSON so backend can merge with new uploaded images
       const placesDetailsForJSON = formData.placesDetails.map((place, placeIndex) => {
         const cleanPlace: any = { ...place }
         
-        // Remove placeImageFiles (will be sent separately)
+        // Remove placeImageFiles (will be sent separately as files)
         delete cleanPlace.placeImageFiles
+        
+        // Preserve existing placeDetails image URLs (filter out blob URLs, keep only Cloudinary/external URLs)
+        // These URLs will be merged with new uploaded place images by backend
+        if (cleanPlace.images && Array.isArray(cleanPlace.images)) {
+          cleanPlace.images = cleanPlace.images.filter((img: string) => 
+            typeof img === "string" && img.length > 0 && !img.startsWith("blob:")
+          )
+        } else if (!cleanPlace.images) {
+          // Ensure images array exists (even if empty) so backend can add new images
+          cleanPlace.images = []
+        }
         
         // Remove imageFile from each array and collect them separately
         if (cleanPlace.topAttractions) {
@@ -225,25 +264,37 @@ export function CategoryDestinationForm({ initialData, isEdit = false }: Categor
       // Add placesDetails as JSON (without imageFile properties)
       formDataToSend.append("placesDetails", JSON.stringify(placesDetailsForJSON))
 
-      // Main category images - append as "image" for first image and "images" for all
+      // Main category images handling
+      // Filter out blob URLs from imagePreviews to get only real URLs (Cloudinary or external URLs)
+      const existingImageUrls = imagePreviews.filter((img: string) => 
+        typeof img === "string" && img.length > 0 && !img.startsWith("blob:")
+      )
+      
+      // Send existing image URLs as JSON array (for update mode)
+      if (existingImageUrls.length > 0) {
+        formDataToSend.append("images", JSON.stringify(existingImageUrls))
+      }
+      
+      // Send new uploaded files
       if (imageFiles.length > 0) {
-        imageFiles.forEach((file, index) => {
-          if (index === 0) {
-            formDataToSend.append("image", file)
-          }
+        imageFiles.forEach((file) => {
           formDataToSend.append("images", file)
         })
-      } else if (isEdit && initialData?.image && imageFiles.length === 0) {
-        formDataToSend.append("image", initialData.image)
+        // Also set first file as main "image" field
+        formDataToSend.append("image", imageFiles[0])
+      } else if (existingImageUrls.length > 0) {
+        // If no new files but have existing URLs, use first URL as main image
+        formDataToSend.append("image", existingImageUrls[0])
       }
 
       // Extract and send images from placesDetails
+      // IMPORTANT: Send placeDetails images with "placeImages" key to avoid mixing with main category images
       formData.placesDetails.forEach((place, placeIndex) => {
-        // Place images (multiple images per place)
+        // Place images (multiple images per place) - send with separate "placeImages" key
         if ((place as any).placeImageFiles && Array.isArray((place as any).placeImageFiles)) {
           (place as any).placeImageFiles.forEach((file: File) => {
             if (file instanceof File) {
-              formDataToSend.append("images", file)
+              formDataToSend.append("placeImages", file) // Use separate key to avoid mixing
             }
           })
         }
@@ -529,14 +580,14 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, updatePlaceWith
   const { toast } = useToast()
 
   useEffect(() => {
-    setLocalPlace(place)
-    // Set image previews from existing images
-    if (place.images && Array.isArray(place.images)) {
-      const existingImages = place.images.filter((img: string) => typeof img === "string" && img.length > 0)
-      setPlaceImagePreviews(existingImages)
-    } else {
-      setPlaceImagePreviews([])
+    // Set image previews from existing images (keep existing URLs, don't mix with blob URLs)
+    let existingImages: string[] = []
+    if (place.images && Array.isArray(place.images) && place.images.length > 0) {
+      existingImages = place.images.filter((img: string) => typeof img === "string" && img.length > 0)
     }
+    setPlaceImagePreviews(existingImages)
+    // Update localPlace with images preserved
+    setLocalPlace({ ...place, images: existingImages })
     setPlaceImageFiles([])
   }, [place])
 
@@ -545,58 +596,78 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, updatePlaceWith
     if (files.length > 0) {
       setPlaceImageFiles(prev => [...prev, ...files])
       const previews = files.map((file) => URL.createObjectURL(file))
+      // Add new preview URLs to the preview list (but keep existing image URLs in localPlace.images)
       setPlaceImagePreviews(prev => [...prev, ...previews])
-      // Store files in localPlace for submission
+      // Store files separately for submission
       const updatedPlace: any = { ...localPlace }
       if (!updatedPlace.placeImageFiles) {
         updatedPlace.placeImageFiles = []
       }
       updatedPlace.placeImageFiles = [...updatedPlace.placeImageFiles, ...files]
-      // Update images array with preview URLs for display
-      updatedPlace.images = [...(localPlace.images || []), ...previews]
+      // Keep existing images URLs and add new preview URLs for display only
+      // Existing images are already in localPlace.images, just add preview URLs
+      const existingImages = localPlace.images || []
+      updatedPlace.images = [...existingImages, ...previews]
       setLocalPlace(updatedPlace)
-      // Update parent formData with both images and placeImageFiles
+      // Update parent formData - images should contain existing URLs + new preview URLs for display
       updatePlaceWithImageFiles(placeIndex, {
-        images: updatedPlace.images,
+        ...updatedPlace,
         placeImageFiles: updatedPlace.placeImageFiles
       })
     }
+    // Reset input to allow selecting same file again
+    e.target.value = ''
   }
 
   const removePlaceImage = (index: number) => {
-    // Check if it's a new file or existing image
-    const existingImagesCount = (place.images?.length || 0)
-    if (index < existingImagesCount) {
-      // It's an existing image - remove from localPlace
-      const updatedImages = localPlace.images.filter((_, i) => i !== index)
-      const updatedPreviews = placeImagePreviews.filter((_, i) => i !== index)
-      setPlaceImagePreviews(updatedPreviews)
-      const updatedPlace: any = { ...localPlace, images: updatedImages }
-      setLocalPlace(updatedPlace)
-      updatePlaceWithImageFiles(placeIndex, {
-        images: updatedImages,
-        placeImageFiles: updatedPlace.placeImageFiles || []
-      })
-    } else {
-      // It's a new file - remove from placeImageFiles
-      const fileIndex = index - existingImagesCount
+    const preview = placeImagePreviews[index]
+    if (!preview) return
+    
+    const isBlobUrl = typeof preview === "string" && preview.startsWith("blob:")
+    
+    // Remove from previews first
+    const updatedPreviews = placeImagePreviews.filter((_, i) => i !== index)
+    setPlaceImagePreviews(updatedPreviews)
+    
+    if (isBlobUrl) {
+      // It's a new file (blob URL) - remove from files array
+      // Count how many blob URLs come before this index in the original array
+      let blobCount = 0
+      for (let i = 0; i < index; i++) {
+        if (placeImagePreviews[i] && typeof placeImagePreviews[i] === "string" && placeImagePreviews[i].startsWith("blob:")) {
+          blobCount++
+        }
+      }
+      const fileIndex = blobCount
       const updatedFiles = placeImageFiles.filter((_, i) => i !== fileIndex)
       setPlaceImageFiles(updatedFiles)
-      const updatedPreviews = placeImagePreviews.filter((_, i) => i !== index)
-      setPlaceImagePreviews(updatedPreviews)
-      // Remove from localPlace placeImageFiles
-      const updatedPlace: any = { ...localPlace }
-      if (updatedPlace.placeImageFiles) {
-        updatedPlace.placeImageFiles = updatedPlace.placeImageFiles.filter((_: any, i: number) => i !== fileIndex)
+      
+      // Update localPlace.images - use updatedPreviews to filter, which already has the removed blob URL excluded
+      // This ensures we only remove the specific blob URL that was clicked, not all blob URLs
+      const updatedImages = updatedPreviews.filter((img: string) => 
+        typeof img === "string" && !img.startsWith("blob:")
+      )
+      const updatedPlace: any = { 
+        ...localPlace, 
+        images: updatedImages,
+        placeImageFiles: updatedFiles
       }
-      // Also remove from localPlace images array
-      updatedPlace.images = localPlace.images.filter((_, i) => i !== index)
       setLocalPlace(updatedPlace)
+      
       // Update parent formData
-      updatePlaceWithImageFiles(placeIndex, {
-        images: updatedPlace.images,
-        placeImageFiles: updatedPlace.placeImageFiles || []
-      })
+      updatePlaceWithImageFiles(placeIndex, updatedPlace)
+    } else {
+      // It's an existing image (real URL) - just remove it from images array
+      // Use updatedPreviews which already has the removed item excluded
+      const updatedImages = updatedPreviews.filter((img: string) => 
+        typeof img === "string" && !img.startsWith("blob:")
+      )
+      const updatedPlace: any = { 
+        ...localPlace, 
+        images: updatedImages 
+      }
+      setLocalPlace(updatedPlace)
+      updatePlaceWithImageFiles(placeIndex, updatedPlace)
     }
   }
 
@@ -894,6 +965,14 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, updatePlaceWith
             value={localPlace.placeName}
             onChange={(e) => updateField("placeName", e.target.value)}
             placeholder={`e.g., Goa ${categoryLabel}, Manali ${categoryLabel}`}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <Input
+            value={localPlace.location || ""}
+            onChange={(e) => updateField("location", e.target.value)}
+            placeholder="e.g., Goa, India"
           />
         </div>
       </div>

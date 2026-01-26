@@ -12,6 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { API_BASE_URL } from "@/lib/config"
+import { TableRowSkeleton } from "@/components/ui/skeletons"
+import { RootState } from "../redux/store"
+import { useSelector } from "react-redux"
 
 interface Banner {
   _id: string
@@ -25,8 +28,28 @@ interface Banner {
 
 const API_BASE = `${API_BASE_URL}/api/admin/banner`
 
+type BannersPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+type Permission = {
+  module: string;
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
 
 export function BannerTab() {
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+  const [hasPermission, setHasPermission] = useState<BannersPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })
+ 
   const router = useRouter()
   const [banners, setBanners] = useState<Banner[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,6 +62,17 @@ export function BannerTab() {
 
   useEffect(() => {
     fetchBanners()
+  }, [])
+
+  useEffect(() => {
+    const bannersPermission = permissions.find(
+      (p: Permission) => p.module === "banner"
+    )
+    setHasPermission({
+      create: bannersPermission?.create ?? false,
+      update: bannersPermission?.update ?? false,
+      delete: bannersPermission?.delete ?? false,
+    })
   }, [])
 
   useEffect(() => {
@@ -149,10 +183,10 @@ export function BannerTab() {
           <h2 className="text-2xl font-bold">Banners</h2>
           <p className="text-sm text-muted-foreground">Manage website banners and promotional images</p>
         </div>
-        <Button onClick={() => router.push("/admin/banner/new")}>
+        {hasPermission.create && <Button onClick={() => router.push("/admin/banner/new")}>
           <Plus className="h-4 w-4 mr-2" />
           Add Banner
-        </Button>
+        </Button>}
       </div>
 
       <Card>
@@ -170,7 +204,24 @@ export function BannerTab() {
           </div>
 
           {loading ? (
-            <div className="text-center py-8">Loading banners...</div>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <TableRowSkeleton key={`banner-skeleton-${index}`} columns={5} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : banners.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No banners found</div>
           ) : (
@@ -197,14 +248,14 @@ export function BannerTab() {
                         <TableCell>{getStatusBadge(banner.status)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
+                            {hasPermission.update && <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => router.push(`/admin/banner/${banner._id}`)}
                             >
                               <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
+                            </Button>}
+                            {hasPermission.delete && <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => {
@@ -213,7 +264,7 @@ export function BannerTab() {
                               }}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            </Button>}
                           </div>
                         </TableCell>
                       </TableRow>

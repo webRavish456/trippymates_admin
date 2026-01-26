@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 import { Suspense } from "react"
+import { ReduxProvider } from "@/app/redux-provider"
 
 export const metadata: Metadata = {
   title: "Travel Admin Panel",
@@ -14,21 +15,23 @@ export const metadata: Metadata = {
   generator: "v0.app",
 }
 
-
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <Suspense fallback={<div>Loading...</div>}>
-          <AuthProvider>
-            {children}
-            <Toaster />
-          </AuthProvider>
+          <ReduxProvider>
+            <AuthProvider>
+              {children}
+              <Toaster />
+            </AuthProvider>
+          </ReduxProvider>
         </Suspense>
+
         <Analytics />
       </body>
     </html>

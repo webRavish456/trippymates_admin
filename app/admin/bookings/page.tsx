@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import { TableRowSkeleton } from "@/components/ui/skeletons"
 import {
   Dialog,
   DialogContent,
@@ -355,7 +356,27 @@ export default function BookingsPage() {
       <Card>
         <CardContent className="pt-6">
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading bookings...</div>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Booking ID</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Package</TableHead>
+                    <TableHead>Trip Date</TableHead>
+                    <TableHead>Guests</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <TableRowSkeleton key={`booking-skeleton-${index}`} columns={8} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : filteredBookings.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No bookings found</div>
           ) : (

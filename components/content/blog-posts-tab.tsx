@@ -13,7 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import TipTapEditor from "@/components/ui/tiptap-editor"
 import { API_BASE_URL } from "@/lib/config"
-
+import { CardSkeleton } from "@/components/ui/skeletons"
+import { RootState } from "../redux/store"
+import { useSelector } from "react-redux"
+      
 interface Blog {
   _id: string
   title: string
@@ -35,7 +38,29 @@ interface BlogPostsTabProps {
   sectionType?: "main" | "article"
 }
 
+type BlogPostsPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+type Permission = {
+  module: string;
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
 export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
+
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+  const [hasPermission, setHasPermission] = useState<BlogPostsPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })
+  
   const [blogs, setBlogs] = useState<Blog[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -71,6 +96,17 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
   useEffect(() => {
     fetchBlogs()
   }, [currentPage, searchQuery])
+
+  useEffect(() => {
+    const blogPostsPermission = permissions.find(
+      (p: Permission) => p.module === "content"
+    )
+    setHasPermission({
+      create: blogPostsPermission?.create ?? false,
+      update: blogPostsPermission?.update ?? false,
+      delete: blogPostsPermission?.delete ?? false,
+    })
+  }, [])
 
   const fetchBlogs = async () => {
     try {
@@ -358,10 +394,10 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
               : "Manage main blog posts for top section"}
           </p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        {hasPermission.create && <Button onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add {sectionType === "article" ? "Article" : "Blog Post"}
-        </Button>
+        </Button>}
       </div>
 
       <Card>
@@ -381,7 +417,11 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
       </Card>
 
       {loading ? (
-        <div className="text-center py-8">Loading blogs...</div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <CardSkeleton key={`blog-skeleton-${index}`} />
+          ))}
+        </div>
       ) : blogs.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -444,12 +484,12 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
                           <Button variant="ghost" size="sm" onClick={() => openViewDialog(blog)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(blog)}>
+                          {hasPermission.update && <Button variant="ghost" size="sm" onClick={() => openEditDialog(blog)}>
                             <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteBlog(blog._id)}>
+                          </Button>}
+                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteBlog(blog._id)}>
                             <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                          </Button>}
                         </div>
                       </td>
                     </tr>

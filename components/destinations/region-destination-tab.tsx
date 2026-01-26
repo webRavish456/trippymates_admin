@@ -13,7 +13,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { Star, Activity, Calendar } from "lucide-react"
+import { TableRowSkeleton } from "@/components/ui/skeletons"
 
 interface Destination {
   _id: string
@@ -28,14 +30,40 @@ interface Destination {
 }
 
 import { API_BASE_URL } from "@/lib/config"
+import { useSelector } from "react-redux"
+import { RootState } from "../redux/store"
 
 const API_BASE = `${API_BASE_URL}/api/admin/destination`
 
+type Permission = {
+  module: string;
+  create: boolean;
+  read?: boolean;
+  update?: boolean;
+  delete?: boolean;
+};
+
+type ExploreDestinationPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
 export function RegionDestinationTab() {
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+  const [hasPermission, setHasPermission] = useState<ExploreDestinationPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })  
   const router = useRouter()
   const [destinations, setDestinations] = useState<Destination[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null)
@@ -43,7 +71,19 @@ export function RegionDestinationTab() {
 
   useEffect(() => {
     fetchDestinations()
+    setCurrentPage(1) // Reset to first page when search changes
   }, [searchQuery])
+
+  useEffect(() => {
+    const regionDestinationPermission = permissions.find(
+      (p: Permission) => p.module === "explore_destination"
+    )
+    setHasPermission({
+      create: regionDestinationPermission?.create ?? false,
+      update: regionDestinationPermission?.update ?? false,
+      delete: regionDestinationPermission?.delete ?? false,
+    })
+  }, [])
 
   const fetchDestinations = async () => {
     try {
@@ -59,11 +99,8 @@ export function RegionDestinationTab() {
       }
     } catch (error) {
       console.error("Fetch error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch destinations",
-        variant: "destructive",
-      })
+      setDestinations([])
+      // Don't show toast for GET requests
     } finally {
       setLoading(false)
     }
@@ -119,11 +156,7 @@ export function RegionDestinationTab() {
       }
     } catch (error) {
       console.error("Fetch error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch destination details",
-        variant: "destructive",
-      })
+      // Don't show toast for GET requests
     }
   }
 
@@ -132,6 +165,17 @@ export function RegionDestinationTab() {
     dest.desc?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredDestinations.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedDestinations = filteredDestinations.slice(startIndex, endIndex)
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -139,10 +183,10 @@ export function RegionDestinationTab() {
           <h2 className="text-2xl font-bold">Region Destinations</h2>
           <p className="text-sm text-muted-foreground">Manage destinations by region (North, South, East, West, etc.)</p>
         </div>
-        <Button onClick={() => router.push("/admin/explore-destination/region/new")}>
+        {hasPermission.create && <Button onClick={() => router.push("/admin/explore-destination/region/new")}>
           <Plus className="h-4 w-4 mr-2" />
           Add Region Destination
-        </Button>
+        </Button>}
       </div>
 
       <Card>
@@ -162,11 +206,24 @@ export function RegionDestinationTab() {
       </Card>
 
       {loading ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Loading destinations...
-          </CardContent>
-        </Card>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Region</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead>Famous For</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <TableRowSkeleton key={`skeleton-${index}`} columns={5} />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : filteredDestinations.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -175,18 +232,19 @@ export function RegionDestinationTab() {
         </Card>
       ) : (
         <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[80px]">Image</TableHead>
-                <TableHead className="w-[150px]">Region</TableHead>
-                <TableHead className="w-[250px]">Description</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
-                <TableHead className="text-right w-[120px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredDestinations.map((destination) => (
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">Image</TableHead>
+                  <TableHead className="w-[150px]">Region</TableHead>
+                  <TableHead className="w-[250px]">Description</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="text-right w-[120px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedDestinations.map((destination) => (
                 <TableRow key={destination._id}>
                   <TableCell>
                     {destination.image ? (
@@ -226,14 +284,14 @@ export function RegionDestinationTab() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button
+                      {hasPermission.update && <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => router.push(`/admin/explore-destination/region/${destination._id}`)}
                       >
                         <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
+                      </Button>}      
+                      {hasPermission.delete && <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => {
@@ -242,13 +300,64 @@ export function RegionDestinationTab() {
                         }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      </Button>}
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center mt-6 pb-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      if (
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      ) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(page)}
+                              isActive={currentPage === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      } else if (page === currentPage - 2 || page === currentPage + 2) {
+                        return (
+                          <PaginationItem key={page}>
+                            <span className="px-3 py-2">...</span>
+                          </PaginationItem>
+                        )
+                      }
+                      return null
+                    })}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </CardContent>
         </Card>
       )}
 
@@ -296,7 +405,10 @@ export function RegionDestinationTab() {
                         <div className="border rounded-lg p-6 space-y-6">
                           <div>
                             <h4 className="text-xl font-bold mb-2">{place.placeName}</h4>
-                            {place.images && place.images.length > 0 && (
+                            {place.location && (
+                              <p className="text-sm text-muted-foreground mb-4">📍 {place.location}</p>
+                            )}
+                            {place.images && Array.isArray(place.images) && place.images.length > 0 && (
                               <div className="grid grid-cols-2 gap-2 mb-4">
                                 {place.images.slice(0, 2).map((image: string, imgIdx: number) => (
                                   <img
@@ -317,7 +429,7 @@ export function RegionDestinationTab() {
                             </div>
                           )}
 
-                          {place.topAttractions && place.topAttractions.length > 0 && (
+                          {place.topAttractions && Array.isArray(place.topAttractions) && place.topAttractions.length > 0 && (
                             <div>
                               <h5 className="font-semibold mb-3">Top Attractions</h5>
                               <Carousel className="w-full">
@@ -352,7 +464,7 @@ export function RegionDestinationTab() {
                             </div>
                           )}
 
-                          {place.food && place.food.length > 0 && (
+                          {place.food && Array.isArray(place.food) && place.food.length > 0 && (
                             <div>
                               <h5 className="font-semibold mb-3">Food & Local Cuisine</h5>
                               <Carousel className="w-full">
@@ -390,7 +502,7 @@ export function RegionDestinationTab() {
                             </div>
                           )}
 
-                          {place.hotels && place.hotels.length > 0 && (
+                          {place.hotels && Array.isArray(place.hotels) && place.hotels.length > 0 && (
                             <div>
                               <h5 className="font-semibold mb-3">Hotels</h5>
                               <Carousel className="w-full">
@@ -439,7 +551,7 @@ export function RegionDestinationTab() {
                             </div>
                           )}
 
-                          {place.activities && place.activities.length > 0 && (
+                          {place.activities && Array.isArray(place.activities) && place.activities.length > 0 && (
                             <div>
                               <h5 className="font-semibold mb-3">Activities & Experiences</h5>
                               <Carousel className="w-full">
@@ -485,7 +597,7 @@ export function RegionDestinationTab() {
                             </div>
                           )}
 
-                          {place.eventsFestivals && place.eventsFestivals.length > 0 && (
+                          {place.eventsFestivals && Array.isArray(place.eventsFestivals) && place.eventsFestivals.length > 0 && (
                             <div>
                               <h5 className="font-semibold mb-3">Events & Festivals</h5>
                               <Carousel className="w-full">
@@ -531,7 +643,7 @@ export function RegionDestinationTab() {
                             </div>
                           )}
 
-                          {place.nearbyDestinations && place.nearbyDestinations.length > 0 && (
+                          {place.nearbyDestinations && Array.isArray(place.nearbyDestinations) && place.nearbyDestinations.length > 0 && (
                             <div>
                               <h5 className="font-semibold mb-3">Nearby Destinations</h5>
                               <Carousel className="w-full">

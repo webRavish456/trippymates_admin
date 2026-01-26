@@ -12,6 +12,7 @@ import { API_BASE_URL } from "@/lib/config"
 import io, { Socket } from "socket.io-client"
 import { formatDistanceToNow } from "date-fns"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ListSkeleton } from "@/components/ui/skeletons"
 
 interface Notification {
   _id: string
@@ -154,12 +155,15 @@ export default function NotificationsPage() {
           title: "Success",
           description: "Notification marked as read",
         })
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to mark as read")
       }
     } catch (error) {
       console.error("Error marking notification as read:", error)
       toast({
         title: "Error",
-        description: "Failed to mark notification as read",
+        description: error instanceof Error ? error.message : "Failed to mark notification as read",
         variant: "destructive",
       })
     }
@@ -371,6 +375,49 @@ export default function NotificationsPage() {
     }
   }
 
+  // Helper function to mark notification as read (without toast)
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      const baseUrl = API_BASE_URL.replace(/\/+$/, '').replace(/\/api$/, '')
+      const response = await fetch(`${baseUrl}/api/admin/notifications/${notificationId}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+
+      if (response.ok) {
+        setNotifications(prev =>
+          prev.map(notif =>
+            notif._id === notificationId
+              ? { ...notif, isRead: true }
+              : notif
+          )
+        )
+      }
+    } catch (error) {
+      console.error("Error marking notification as read:", error)
+    }
+  }
+
+  // Auto-mark notifications as read when viewing in "all" tab
+  useEffect(() => {
+    if (activeTab === "all" && notifications.length > 0 && adminToken) {
+      const unreadNotifications = notifications.filter(n => !n.isRead)
+      if (unreadNotifications.length > 0) {
+        // Mark all unread notifications as read after a short delay (when user views them)
+        const timer = setTimeout(() => {
+          unreadNotifications.forEach(notif => {
+            markNotificationAsRead(notif._id)
+          })
+        }, 2000) // 2 second delay to ensure user has seen them
+
+        return () => clearTimeout(timer)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]) // Only depend on activeTab to avoid infinite loop
+
   // Filter notifications based on active tab
   const filteredNotifications = notifications.filter(notif => {
     if (activeTab === "unread") {
@@ -436,9 +483,7 @@ export default function NotificationsPage() {
             <TabsContent value={activeTab} className="mt-4">
               <CardContent className="p-0">
                 {loading ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    Loading notifications...
-                  </div>
+                  <ListSkeleton items={8} />
                 ) : filteredNotifications.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     {activeTab === "unread" 

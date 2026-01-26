@@ -11,8 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
-
+import { useDispatch } from "react-redux"
+import { setPermissions } from "@/components/redux/action"
 export default function LoginPage() {
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -20,7 +22,10 @@ export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
 
+  const dispatch = useDispatch()
+
   const handleSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault()
     setIsLoading(true)
 
@@ -40,19 +45,26 @@ export default function LoginPage() {
       
       console.log("API Response:", data)
 
-      // ✅ FIXED: Correct typo - token not oken
+
       if (data?.status === "true" && data?.Token) {
-        // Save token and user data
+
+        const adminData = data?.data?.admin || {}
+        const roleName = adminData.roleName || "Admin"
+        const userName = adminData.name || email.split('@')[0]
+        
+   
+
+        dispatch(setPermissions(adminData.permissions))
+   
         const userData = {
-          token: data.Token,  // ✅ Fixed typo here
+          token: data.Token,
           user: { 
-            email,
-            name: email.split('@')[0], // Extract name from email
-            role: "admin" // Add role
+            id: adminData._id,
+            email: adminData.email || email,
+            name: userName,
+            role: roleName 
           }
         }
-        
-        console.log("Calling login with:", userData)
         
         await login(userData)
         
@@ -61,14 +73,18 @@ export default function LoginPage() {
           description: `Welcome back, ${email}!`,
         })
         
-        // Use setTimeout to ensure state updates before navigation
+
         setTimeout(() => {
           router.push("/admin")
         }, 100)
       } else {
+        const msg = String(data?.message || "")
+        const isEmailNotFound =
+          msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("record with this email")
+
         toast({
-          title: "Login failed",
-          description: data?.message || "Invalid credentials",
+          title: isEmailNotFound ? "Invalid Email" : "Login failed",
+          description: isEmailNotFound ? "Please check your email" : (data?.message || "Invalid credentials"),
           variant: "destructive",
         })
       }

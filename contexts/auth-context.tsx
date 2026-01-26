@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { useRouter, usePathname } from "next/navigation"
 
-export type UserRole = "super_admin" | "content_manager" | "customer_support" | "admin"
+export type UserRole = string // Allow any role name
 
 export interface User {
   id?: string

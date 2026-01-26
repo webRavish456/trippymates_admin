@@ -16,9 +16,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 interface PlaceDetail {
   placeName: string
+  location: string
   description: string
   weatherInfo: string
   images: string[]
+  imageFiles?: File[] // For storing actual File objects temporarily
   food: Array<{ name: string; description: string; image: string; type?: string; vegType?: string; nonVegType?: string }>
   hotels: Array<{ name: string; description: string; image: string; rating?: number; priceRange?: string; location?: string }>
   activities: Array<{ name: string; type: string; description: string; image: string; duration?: string; priceRange?: string; location?: string }>
@@ -45,7 +47,6 @@ export function SeasonDestinationForm({ initialData, isEdit = false }: SeasonDes
     title: "",
     color: "#af52de",
     places: "",
-    location: "",
     desc: "",
     type: "season",
     status: "active" as "active" | "inactive",
@@ -59,15 +60,20 @@ export function SeasonDestinationForm({ initialData, isEdit = false }: SeasonDes
 
   useEffect(() => {
     if (initialData && isEdit) {
+      // Initialize placesDetails with empty imageFiles arrays
+      const placesDetailsWithFiles = (initialData.placesDetails || []).map((place: any) => ({
+        ...place,
+        imageFiles: [] // Initialize empty for edit mode
+      }))
+      
       setFormData({
         title: initialData.title || "",
         color: initialData.color || "#af52de",
-        places: initialData.places || "",
-        location: initialData.location || "",
+        places: initialData.placesSummary || initialData.places || "",
         desc: initialData.desc || "",
         type: "season",
         status: initialData.status || "active",
-        placesDetails: initialData.placesDetails || [],
+        placesDetails: placesDetailsWithFiles,
       })
       // Handle both single image and multiple images
       if (initialData.images && Array.isArray(initialData.images)) {
@@ -91,15 +97,24 @@ export function SeasonDestinationForm({ initialData, isEdit = false }: SeasonDes
   }
 
   const removeImage = (index: number) => {
-    // Check if it's a new file or existing image
-    const existingImagesCount = initialData?.images?.length || (initialData?.image ? 1 : 0)
-    if (index < existingImagesCount) {
-      // It's an existing image - remove from previews only
+    // Check if it's a new file or existing image by checking if it's a blob URL
+    const preview = imagePreviews[index]
+    const isBlobUrl = preview && typeof preview === "string" && preview.startsWith("blob:")
+    
+    if (isBlobUrl) {
+      // It's a new file (blob URL) - remove from both files and previews
+      // Count how many blob URLs come before this index
+      let blobCount = 0
+      for (let i = 0; i < index; i++) {
+        if (imagePreviews[i] && typeof imagePreviews[i] === "string" && imagePreviews[i].startsWith("blob:")) {
+          blobCount++
+        }
+      }
+      const fileIndex = blobCount
+      setImageFiles(imageFiles.filter((_, i) => i !== fileIndex))
       setImagePreviews(imagePreviews.filter((_, i) => i !== index))
     } else {
-      // It's a new file - remove from both files and previews
-      const fileIndex = index - existingImagesCount
-      setImageFiles(imageFiles.filter((_, i) => i !== fileIndex))
+      // It's an existing image (real URL) - remove from previews only
       setImagePreviews(imagePreviews.filter((_, i) => i !== index))
     }
   }
@@ -107,9 +122,11 @@ export function SeasonDestinationForm({ initialData, isEdit = false }: SeasonDes
   const addPlace = () => {
     const newPlace: PlaceDetail = {
       placeName: "",
+      location: "",
       description: "",
       weatherInfo: "",
       images: [],
+      imageFiles: [],
       food: [],
       hotels: [],
       activities: [],
@@ -182,15 +199,26 @@ export function SeasonDestinationForm({ initialData, isEdit = false }: SeasonDes
       }
       formDataToSend.append("name", formData.title)
       formDataToSend.append("description", formData.desc)
-
-      // Create places string from placesDetails
-      const placesString = formData.placesDetails.map(p => p.placeName).join(", ")
-      formDataToSend.append("places", placesString)
-      formDataToSend.append("location", formData.location || placesString)
+      
+      // Send places summary as a simple string field
+      if (formData.places) {
+        formDataToSend.append("placesSummary", formData.places)
+      }
 
       // Extract imageFiles from placesDetails before stringifying
       const placesDetailsForJSON = formData.placesDetails.map((place, placeIndex) => {
         const cleanPlace: any = { ...place }
+        
+        // Remove placeImageFiles (will be sent separately)
+        delete cleanPlace.placeImageFiles
+        delete cleanPlace.imageFiles // Remove imageFiles from JSON
+        
+        // Filter out blob URLs from images array (keep only real URLs from backend)
+        if (cleanPlace.images && Array.isArray(cleanPlace.images)) {
+          cleanPlace.images = cleanPlace.images.filter((img: string) => 
+            typeof img === "string" && img.length > 0 && !img.startsWith("blob:")
+          )
+        }
         
         // Remove imageFile from each array and collect them separately
         if (cleanPlace.topAttractions) {
@@ -236,20 +264,39 @@ export function SeasonDestinationForm({ initialData, isEdit = false }: SeasonDes
       // Add placesDetails as JSON (without imageFile properties)
       formDataToSend.append("placesDetails", JSON.stringify(placesDetailsForJSON))
 
-      // Main images - append as "image" for first image and "images" for all
+      // Main images handling
+      const existingImageUrls = imagePreviews.filter((img: string) => 
+        typeof img === "string" && img.length > 0 && !img.startsWith("blob:")
+      )
+      
+      // Send all existing image URLs as JSON array
+      if (existingImageUrls.length > 0) {
+        formDataToSend.append("images", JSON.stringify(existingImageUrls))
+      }
+      
+      // Send new uploaded image files
       if (imageFiles.length > 0) {
-        imageFiles.forEach((file, index) => {
-          if (index === 0) {
-            formDataToSend.append("image", file)
-          }
+        imageFiles.forEach((file) => {
           formDataToSend.append("images", file)
         })
-      } else if (isEdit && initialData?.image && imageFiles.length === 0) {
-        formDataToSend.append("image", initialData.image)
+        // Also set the first new file as the main "image" field
+        formDataToSend.append("image", imageFiles[0])
+      } else if (existingImageUrls.length > 0) {
+        // If no new files but existing URLs, use first URL as main image
+        formDataToSend.append("image", existingImageUrls[0])
       }
 
       // Extract and send images from placesDetails
+      // Send place images separately for each place
       formData.placesDetails.forEach((place, placeIndex) => {
+        // Place images (main images for each place)
+        if (place.imageFiles && Array.isArray(place.imageFiles)) {
+          place.imageFiles.forEach((file: File) => {
+            formDataToSend.append("placeImages", file)
+          })
+        }
+        
+        // Top Attractions images
         // Top Attractions images
         if (place.topAttractions) {
           place.topAttractions.forEach((attraction: any) => {
@@ -385,14 +432,14 @@ export function SeasonDestinationForm({ initialData, isEdit = false }: SeasonDes
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location">Location *</Label>
+              <Label htmlFor="places">Places Summary (Optional)</Label>
               <Input
-                id="location"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                id="places"
+                value={formData.places}
+                onChange={(e) => setFormData({ ...formData, places: e.target.value })}
                 placeholder="e.g., Goa, Rajasthan, Kerala, Darjeeling, Mussoorie"
-                required
               />
+              <p className="text-xs text-muted-foreground">This is just a summary for reference. Add detailed place information below in "Place Details".</p>
             </div>
 
             <div className="space-y-2">
@@ -534,9 +581,10 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, removePlace, se
     activities: [...(place.activities || [])],
     eventsFestivals: [...(place.eventsFestivals || [])],
     nearbyDestinations: [...(place.nearbyDestinations || [])],
-    images: [...(place.images || [])]
+    images: [...(place.images || [])],
+    imageFiles: [...(place.imageFiles || [])]
   }))
-  const [placeImageFiles, setPlaceImageFiles] = useState<File[]>([])
+  const [placeImageFiles, setPlaceImageFiles] = useState<File[]>(place.imageFiles || [])
   const [attractionForm, setAttractionForm] = useState({ name: "", description: "", image: null as File | null })
   const [activityForm, setActivityForm] = useState({ name: "", type: "", description: "", image: null as File | null, duration: "", priceRange: "", location: "" })
   const [eventForm, setEventForm] = useState({ name: "", type: "", description: "", image: null as File | null, month: "", startDate: "", endDate: "", location: "" })
@@ -587,10 +635,16 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, removePlace, se
       activities: [...(place.activities || [])],
       eventsFestivals: [...(place.eventsFestivals || [])],
       nearbyDestinations: [...(place.nearbyDestinations || [])],
-      images: [...(place.images || [])]
+      images: [...(place.images || [])],
+      imageFiles: [...(place.imageFiles || [])]
     })
-    setPlaceImageFiles([])
+    setPlaceImageFiles(place.imageFiles || [])
   }, [placeIndex])
+  
+  // Sync placeImageFiles to parent whenever it changes
+  useEffect(() => {
+    updatePlaceDetail(placeIndex, "imageFiles" as keyof PlaceDetail, placeImageFiles)
+  }, [placeImageFiles, placeIndex])
 
   // Auto-set month and dates when seasonMonth changes
   useEffect(() => {
@@ -904,6 +958,15 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, removePlace, se
             placeholder="e.g., Himachal Pradesh"
           />
         </div>
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <Input
+            value={localPlace.location || ""}
+            onChange={(e) => updateField("location", e.target.value)}
+            onBlur={() => handleFieldBlur("location")}
+            placeholder="e.g., Shimla, Himachal Pradesh"
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -937,9 +1000,12 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, removePlace, se
           onChange={(e) => {
             const files = Array.from(e.target.files || [])
             if (files.length > 0) {
-              setPlaceImageFiles([...placeImageFiles, ...files])
+              const newPlaceImageFiles = [...placeImageFiles, ...files]
+              setPlaceImageFiles(newPlaceImageFiles)
               const imageUrls = files.map(file => URL.createObjectURL(file))
-              updateField("images", [...(localPlace.images || []), ...imageUrls])
+              const updatedImages = [...(localPlace.images || []), ...imageUrls]
+              setLocalPlace({ ...localPlace, images: updatedImages })
+              updatePlaceDetail(placeIndex, "images", updatedImages)
             }
           }}
         />
@@ -957,12 +1023,31 @@ function PlaceDetailForm({ place, placeIndex, updatePlaceDetail, removePlace, se
                 size="icon"
                 className="absolute top-1 right-1 h-6 w-6"
                 onClick={() => {
+                  const imageToRemove = localPlace.images[index]
                   const updatedImages = localPlace.images.filter((_, i) => i !== index)
-                  updateField("images", updatedImages)
-                  // Also remove from placeImageFiles if it's a new file
-                  if (index < placeImageFiles.length) {
-                    setPlaceImageFiles(placeImageFiles.filter((_, i) => i !== index))
+                  
+                  // Update local and sync to parent immediately
+                  setLocalPlace({ ...localPlace, images: updatedImages })
+                  updatePlaceDetail(placeIndex, "images", updatedImages)
+                  
+                  // Check if it's a blob URL (newly uploaded file)
+                  const isBlobUrl = imageToRemove && typeof imageToRemove === "string" && imageToRemove.startsWith("blob:")
+                  
+                  if (isBlobUrl) {
+                    // It's a newly uploaded file - count how many blob URLs come before this index
+                    let blobCount = 0
+                    for (let i = 0; i < index; i++) {
+                      if (localPlace.images[i] && typeof localPlace.images[i] === "string" && localPlace.images[i].startsWith("blob:")) {
+                        blobCount++
+                      }
+                    }
+                    // Remove the corresponding file from placeImageFiles
+                    const newPlaceImageFiles = [...placeImageFiles]
+                    newPlaceImageFiles.splice(blobCount, 1)
+                    setPlaceImageFiles(newPlaceImageFiles)
                   }
+                  // If it's an existing URL (not blob), just remove from images array
+                  // The backend will handle the update based on the updated images array in placesDetails
                 }}
               >
                 <X className="h-3 w-3" />

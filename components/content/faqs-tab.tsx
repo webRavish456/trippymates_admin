@@ -12,6 +12,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import { ListSkeleton } from "@/components/ui/skeletons"
+import { RootState } from "../redux/store"
+import { useSelector } from "react-redux"
 
 interface FAQ {
   _id: string
@@ -22,7 +25,28 @@ interface FAQ {
   createdAt: string
 }
 
+type FAQsPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+type Permission = {
+  module: string;
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
 export function FAQsTab() {
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+  const [hasPermission, setHasPermission] = useState<FAQsPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })
+ 
   const [faqs, setFaqs] = useState<FAQ[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -47,6 +71,17 @@ export function FAQsTab() {
   useEffect(() => {
     fetchFAQs()
   }, [currentPage, searchQuery, categoryFilter, statusFilter])
+
+  useEffect(() => {
+    const faqsPermission = permissions.find(
+      (p: Permission) => p.module === "content"
+    )
+    setHasPermission({
+      create: faqsPermission?.create ?? false,
+      update: faqsPermission?.update ?? false,
+      delete: faqsPermission?.delete ?? false,
+    })
+  }, [])
 
   const fetchFAQs = async () => {
     try {
@@ -243,10 +278,10 @@ export function FAQsTab() {
           <h2 className="text-2xl font-bold">FAQs</h2>
           <p className="text-sm text-muted-foreground">Manage frequently asked questions</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        {hasPermission.create && <Button onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add FAQ
-        </Button>
+        </Button>}
       </div>
 
       <Card>
@@ -290,7 +325,7 @@ export function FAQsTab() {
       </Card>
 
       {loading ? (
-        <div className="text-center py-8">Loading FAQs...</div>
+        <ListSkeleton items={8} />
       ) : faqs.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -329,12 +364,12 @@ export function FAQsTab() {
                           <Button variant="ghost" size="sm" onClick={() => openViewDialog(faq)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(faq)}>
+                          {hasPermission.update && <Button variant="ghost" size="sm" onClick={() => openEditDialog(faq)}>
                             <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteFAQ(faq._id)}>
+                          </Button>}
+                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteFAQ(faq._id)}>
                             <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                          </Button>}
                         </div>
                       </td>
                     </tr>

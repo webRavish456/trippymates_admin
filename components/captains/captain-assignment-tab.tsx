@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+
 interface Assignment {
   _id: string
   captainId: {
@@ -50,7 +51,24 @@ const API_BASE = `${API_BASE_URL}/api/admin/captain-assignment`
 const CAPTAIN_API_BASE = `${API_BASE_URL}/api/admin/captain`
 const PACKAGE_API_BASE = `${API_BASE_URL}/api/admin/packages`
 
+type CaptainPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
+type Permission = {
+  module: string;
+  create: boolean;
+  read?: boolean;
+  update?: boolean;
+  delete?: boolean;
+};
+
 export function CaptainAssignmentTab() {
+
+
+
   const router = useRouter()
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,6 +82,10 @@ export function CaptainAssignmentTab() {
   const [packages, setPackages] = useState<any[]>([])
   const [captainStats, setCaptainStats] = useState<Record<string, number>>({})
   const { toast } = useToast()
+
+
+
+
 
   useEffect(() => {
     fetchAssignments()
@@ -172,40 +194,6 @@ export function CaptainAssignmentTab() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
     fetchAssignments(page, filterCaptain, filterPackage, filterStatus)
-  }
-
-  const handleDeleteAssignment = async () => {
-    if (!selectedAssignment) return
-
-    try {
-      const token = localStorage.getItem('adminToken')
-      const response = await fetch(`${API_BASE}/delete/${selectedAssignment._id}`, {
-        method: "DELETE",
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const result = await response.json()
-
-      if (result.status) {
-        toast({
-          title: "Success",
-          description: "Assignment deleted successfully",
-        })
-        setIsDeleteDialogOpen(false)
-        setSelectedAssignment(null)
-        fetchAssignments(currentPage, filterCaptain, filterPackage, filterStatus)
-      } else {
-        throw new Error(result.message || "Failed to delete assignment")
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete assignment",
-        variant: "destructive",
-      })
-    }
   }
 
   const getStatusBadge = (status: string) => {

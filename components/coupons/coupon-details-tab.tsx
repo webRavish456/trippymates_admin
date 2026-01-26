@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Edit, Trash2, Calendar, DollarSign, Tag, Users, Plus } from "lucide-react"
+import { Search, Edit, Trash2, Calendar, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -11,6 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { API_BASE_URL } from "@/lib/config"
+import { TableRowSkeleton } from "@/components/ui/skeletons"
+import { RootState } from "../redux/store"
+import { useSelector } from "react-redux"
+import { useRouter } from "next/navigation"
 
 interface Coupon {
   _id: string
@@ -31,9 +35,34 @@ interface Coupon {
 
 const API_BASE = `${API_BASE_URL}/api/admin/coupon`
 
+type CouponsPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+type Permission = {
+  module: string;
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
 export function CouponDetailsTab() {
+
+const router = useRouter()
+
+
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+  const [hasPermission, setHasPermission] = useState<CouponsPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })
+
   const [coupons, setCoupons] = useState<Coupon[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
@@ -43,6 +72,17 @@ export function CouponDetailsTab() {
 
   useEffect(() => {
     fetchCoupons()
+  }, [])
+
+  useEffect(() => {
+    const couponsPermission = permissions.find(
+      (p: Permission) => p.module === "coupon_details"
+    )
+    setHasPermission({
+      create: couponsPermission?.create ?? false,
+      update: couponsPermission?.update ?? false,
+      delete: couponsPermission?.delete ?? false,
+    })
   }, [])
 
   useEffect(() => {
@@ -81,16 +121,12 @@ export function CouponDetailsTab() {
           setCurrentPage(data.data.pagination.page)
           setTotalPages(data.data.pagination.pages)
         }
-      } else {
-        throw new Error(data.message || "Failed to fetch coupons")
       }
+      // Note: Empty array is valid response when success is true
     } catch (error: any) {
       console.error("Fetch error:", error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to fetch coupons",
-        variant: "destructive",
-      })
+      setCoupons([])
+      // Don't show toast for GET requests
     } finally {
       setLoading(false)
     }
@@ -135,6 +171,17 @@ export function CouponDetailsTab() {
     }
   }
 
+  // Calculate actual status based on date
+  const getActualStatus = (coupon: Coupon) => {
+    const now = new Date()
+    const validUntil = new Date(coupon.validUntil)
+    
+    if (validUntil < now) {
+      return 'expired'
+    }
+    return coupon.status
+  }
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       active: "default",
@@ -155,10 +202,10 @@ export function CouponDetailsTab() {
           <h2 className="text-2xl font-bold">Coupon Details</h2>
           <p className="text-sm text-muted-foreground">View and manage all coupon codes</p>
         </div>
-        <Button onClick={() => window.location.href = '/admin/coupon-code/management'}>
+          {hasPermission.create && <Button onClick={() => router.push("/admin/coupon-code/new")}>
           <Plus className="h-4 w-4 mr-2" />
           Create New Coupon
-        </Button>
+        </Button>}
       </div>
 
       <Card>
@@ -176,7 +223,25 @@ export function CouponDetailsTab() {
           </div>
 
           {loading ? (
-            <div className="text-center py-8">Loading coupons...</div>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Discount</TableHead>
+                    <TableHead>Valid Period</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <TableRowSkeleton key={index} columns={6} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : coupons.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No coupons found</div>
           ) : (
@@ -199,8 +264,7 @@ export function CouponDetailsTab() {
                         <TableCell className="font-mono font-semibold">{coupon.code}</TableCell>
                         <TableCell>{coupon.title}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-4 w-4" />
+                          <div className="font-semibold">
                             {coupon.discountType === 'percentage' 
                               ? `${coupon.discountValue}%`
                               : `₹${coupon.discountValue}`
@@ -210,23 +274,23 @@ export function CouponDetailsTab() {
                         <TableCell>
                           <div className="flex items-center gap-1 text-sm">
                             <Calendar className="h-4 w-4" />
-                            {new Date(coupon.validFrom).toLocaleDateString()} - {new Date(coupon.validUntil).toLocaleDateString()}
+                            {new Date(coupon.validFrom).toLocaleDateString('en-GB', { timeZone: 'UTC' })} - {new Date(coupon.validUntil).toLocaleDateString('en-GB', { timeZone: 'UTC' })}
                           </div>
                         </TableCell>
-                        <TableCell>{getStatusBadge(coupon.status)}</TableCell>
+                        <TableCell>{getStatusBadge(getActualStatus(coupon))}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
+                            {hasPermission.update && <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                // Navigate to edit page (management page with id)
-                                window.location.href = `/admin/coupon-code/management?id=${coupon._id}`
+                                // Navigate to edit page
+                                window.location.href = `/admin/coupon-code/edit/${coupon._id}`
                               }}
                             >
                               <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
+                            </Button>}
+                            {hasPermission.delete && <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => {
@@ -235,7 +299,7 @@ export function CouponDetailsTab() {
                               }}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            </Button>}
                           </div>
                         </TableCell>
                       </TableRow>

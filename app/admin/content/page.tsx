@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BlogPostsTab } from "@/components/content/blog-posts-tab"
 import { ArticlesTab } from "@/components/content/articles-tab"
@@ -7,6 +9,16 @@ import { TestimonialsTab } from "@/components/content/testimonials-tab"
 import { FAQsTab } from "@/components/content/faqs-tab"
 
 export default function ContentPage() {
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
+  const [activeTab, setActiveTab] = useState("blog")
+
+  useEffect(() => {
+    if (tabParam && ["blog", "articles", "testimonials", "faqs"].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [tabParam])
+
   return (
     <div className="space-y-6">
       <div>
@@ -14,7 +26,7 @@ export default function ContentPage() {
         <p className="text-muted-foreground">Manage blog posts, testimonials, and FAQs</p>
       </div>
 
-      <Tabs defaultValue="blog" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="blog">Blog Posts</TabsTrigger>
           <TabsTrigger value="articles">Articles</TabsTrigger>

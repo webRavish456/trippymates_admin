@@ -13,6 +13,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import { CardSkeleton } from "@/components/ui/skeletons"
+import { RootState } from "../redux/store"
+import { useSelector } from "react-redux"
 
 interface CommunityTrip {
   _id: string
@@ -50,7 +53,30 @@ interface CommunityTrip {
   createdAt: string
 }
 
+type CommunityTripsPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
+type Permission = {
+  module: string;
+  create: boolean;
+  read?: boolean;
+  update?: boolean;
+  delete?: boolean;
+};
+
 export function CommunityTripsTab() {
+
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+  const [hasPermission, setHasPermission] = useState<CommunityTripsPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })  
   const router = useRouter()
   const [trips, setTrips] = useState<CommunityTrip[]>([])
   const [loading, setLoading] = useState(true)
@@ -97,6 +123,17 @@ export function CommunityTripsTab() {
     }, 500)
     return () => clearTimeout(timeoutId)
   }, [searchQuery])
+
+  useEffect(() => {
+    const communityTripsPermission = permissions.find(
+      (p: Permission) => p.module === "community_trips"
+    )
+    setHasPermission({
+      create: communityTripsPermission?.create ?? false,
+      update: communityTripsPermission?.update ?? false,
+      delete: communityTripsPermission?.delete ?? false,
+    })
+  }, [])
 
   const fetchTrips = async () => {
     try {
@@ -450,7 +487,7 @@ export function CommunityTripsTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>All Communities</CardTitle>
-            <Button
+            {hasPermission.create && <Button
               onClick={() => {
                 resetForm()
                 setIsAddDialogOpen(true)
@@ -458,7 +495,7 @@ export function CommunityTripsTab() {
             >
               <Plus className="mr-2 h-4 w-4" />
               Create Community Trip
-            </Button>
+            </Button>}
           </div>
         </CardHeader>
         <CardContent>
@@ -495,7 +532,11 @@ export function CommunityTripsTab() {
       </Card>
 
       {loading ? (
-        <div className="text-center py-8">Loading trips...</div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <CardSkeleton key={`community-trip-skeleton-${index}`} />
+          ))}
+        </div>
       ) : trips.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -606,7 +647,7 @@ export function CommunityTripsTab() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
+                         {hasPermission.update && <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleEditClick(trip)}
@@ -614,7 +655,8 @@ export function CommunityTripsTab() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
+                          }
+                          {hasPermission.delete && <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteTrip(trip._id)}
@@ -622,9 +664,10 @@ export function CommunityTripsTab() {
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
+                          }
                         </div>
                       </td>
-                    </tr>
+                    </tr> 
                   ))}
                 </tbody>
               </table>

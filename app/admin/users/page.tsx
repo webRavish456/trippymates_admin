@@ -1,73 +1,149 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Search, Eye, User as UserIcon, Mail, Phone, Calendar, ShoppingBag, DollarSign } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Eye, Pencil, Trash2 } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
+import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useSelector } from "react-redux"
+import { RootState } from "@/components/redux/store"
 
-interface BookingHistory {
-  bookingId: string
-  packageName: string
-  totalGuests: number
-  totalAmount: number
-  tripDate: string
-  status: string
-  createdAt: string
-}
+/* ================= TYPES ================= */
+
+type Status = "Active" | "Inactive"
 
 interface User {
   _id: string
+  roleName: string
   name: string
   email: string
   phone: string
-  status: string
-  createdAt: string
-  updatedAt: string
-  lastLogin?: string
-  totalBookings: number
-  totalSpent: number
-  bookingHistory: BookingHistory[]
+  status: Status
 }
 
-interface ApiResponse {
-  status: boolean
-  message: string
-  data: User[]
+interface UserForm {
+  roleName: string
+  password: string
+  confirmPassword: string
+  name: string
+  email: string
+  phone: string
+  status: Status
 }
 
+/* ================= CONSTANTS ================= */
+
+/* ================= PAGE ================= */
+
+type Permission = {
+  module: string;
+  create: boolean;
+  read?: boolean;
+  update?: boolean;
+  delete?: boolean;
+};
+
+type UsersPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
 export default function UsersPage() {
+
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+
   const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<{ _id: string; name: string }[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<Status | "all">("all")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [mode, setMode] = useState<"create" | "edit" | "view">("create")
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
+  const [errors, setErrors] = useState<Partial<Record<keyof UserForm, string>>>({})
+
+  const [userForm, setUserForm] = useState<UserForm>({
+    roleName: "",
+    password: "",
+    confirmPassword: "",
+    name: "",
+    email: "",
+    phone: "",
+    status: "Active",
+  })
+
+  const [hasPermission, setHasPermission] = useState<UsersPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  });
+
+  useEffect(() => {
+    const usersPermission = permissions.find(
+      (p: Permission) => p.module === "users"
+    );
+  
+    setHasPermission({
+      create: usersPermission?.create ?? false,
+      update: usersPermission?.update ?? false,
+      delete: usersPermission?.delete ?? false,
+    });
+  }, []);
+
+  /* ================= FETCH DATA ================= */
+
   useEffect(() => {
     fetchUsers()
+    fetchRoles()
   }, [])
 
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${API_BASE_URL}/api/admin/user/getUser`)
-      const result: ApiResponse = await response.json()
+      const token = localStorage.getItem('token') || document.cookie.split('token=')[1]?.split(';')[0]
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/all`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      const result = await response.json()
       
       if (result.status) {
-        setUsers(result.data)
-        toast({
-          title: "Success",
-          description: result.message,
-        })
+        const formattedUsers = result.data.map((user: any) => ({
+          _id: user._id,
+          roleName: user.roleName || "No Role",
+          name: user.name,
+          email: user.email,
+          phone: user.phone || "",
+          status: user.status
+        }))
+        setUsers(formattedUsers)
       }
     } catch (error) {
       toast({
@@ -80,259 +156,590 @@ export default function UsersPage() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const day = String(date.getDate()).padStart(2, '0')
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    const month = months[date.getMonth()]
-    const year = date.getFullYear()
-    return `${day} ${month} ${year}`
+  const fetchRoles = async () => {
+    try {
+      const token = localStorage.getItem('token') || document.cookie.split('token=')[1]?.split(';')[0]
+      const response = await fetch(`${API_BASE_URL}/api/admin/roles/getRoles`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      const result = await response.json()
+      
+      if (result.status) {
+        // Super Admin should not appear in dropdown (only one super admin exists)
+        const filteredRoles = (result.data || []).filter(
+          (r: any) => String(r?.name || "").toLowerCase() !== "super admin"
+        )
+        setRoles(filteredRoles)
+      }
+    } catch (error) {
+      console.error("Failed to fetch roles:", error)
+    }
   }
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.phone.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || user.status.toLowerCase() === statusFilter.toLowerCase()
-    return matchesSearch && matchesStatus
-  })
+  /* ================= HELPERS ================= */
 
-  const handleViewDetails = (user: User) => {
+  const resetForm = () => {
+    setErrors({})
+    setUserForm({
+      roleName: "",
+      password: "",
+      confirmPassword: "",
+      name: "",
+      email: "",
+      phone: "",
+      status: "Active",
+    })
+    setSelectedUser(null)
+  }
+
+  const validateForm = () => {
+    const nextErrors: Partial<Record<keyof UserForm, string>> = {}
+
+    if (!userForm.roleName?.trim()) nextErrors.roleName = "Role is required"
+    if (!userForm.name?.trim()) nextErrors.name = "Name is required"
+
+    const email = userForm.email?.trim()
+    if (!email) nextErrors.email = "Email is required"
+    else if (!/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = "Invalid email"
+
+    const phone = userForm.phone?.trim()
+    if (phone && !/^\d{10}$/.test(phone)) nextErrors.phone = "Phone must be 10 digits"
+
+    const pwd = userForm.password || ""
+    const cpwd = userForm.confirmPassword || ""
+
+    if (mode === "create") {
+      if (!pwd) nextErrors.password = "Password is required"
+      else if (pwd.length < 6) nextErrors.password = "Password must be at least 6 characters"
+
+      if (!cpwd) nextErrors.confirmPassword = "Confirm Password is required"
+      else if (pwd !== cpwd) nextErrors.confirmPassword = "Passwords do not match"
+    }
+
+    if (mode === "edit" && pwd) {
+      if (pwd.length < 6) nextErrors.password = "Password must be at least 6 characters"
+      if (!cpwd) nextErrors.confirmPassword = "Confirm Password is required"
+      else if (pwd !== cpwd) nextErrors.confirmPassword = "Passwords do not match"
+    }
+
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  /* ================= ACTION HANDLERS ================= */
+
+  const openCreate = () => {
+    resetForm()
+    setMode("create")
+    setIsDialogOpen(true)
+  }
+
+  const openEdit = (user: User) => {
+    setUserForm({
+      roleName: user.roleName,
+      password: "",
+      confirmPassword: "",
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      status: user.status,
+    })
     setSelectedUser(user)
-    setIsDetailsOpen(true)
+    setMode("edit")
+    setIsDialogOpen(true)
   }
 
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Loading users...</div>
-      </div>
-    )
+  const openView = (user: User) => {
+    setUserForm({
+      roleName: user.roleName,
+      password: "",
+      confirmPassword: "",
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      status: user.status,
+    })
+    setSelectedUser(user)
+    setMode("view")
+    setIsDialogOpen(true)
   }
+
+  const handleSave = async () => {
+    try {
+      if (!validateForm()) return
+      const token = localStorage.getItem('token') || document.cookie.split('token=')[1]?.split(';')[0]
+      
+      if (mode === "create") {
+        // Find roleId from roleName
+        const selectedRole = roles.find(r => r.name === userForm.roleName)
+        if (!selectedRole) {
+          toast({
+            title: "Error",
+            description: "Please select a role",
+            variant: "destructive",
+          })
+          return
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/create`, {
+          method: "POST",
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: userForm.name,
+            email: userForm.email,
+            password: userForm.password,
+            confirmPassword: userForm.confirmPassword,
+            roleId: selectedRole._id,
+            phone: userForm.phone
+          })
+        })
+
+        const result = await response.json()
+        
+        if (result.status) {
+          toast({
+            title: "Success",
+            description: "User created successfully",
+          })
+          fetchUsers()
+          setIsDialogOpen(false)
+          resetForm()
+        } else {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to create user",
+            variant: "destructive",
+          })
+        }
+      } else if (mode === "edit" && selectedUser) {
+        // Find roleId from roleName
+        const selectedRole = roles.find(r => r.name === userForm.roleName)
+        
+        const updateData: any = {
+          name: userForm.name,
+          email: userForm.email,
+          phone: userForm.phone,
+          status: userForm.status
+        }
+
+        if (selectedRole) {
+          updateData.roleId = selectedRole._id
+        }
+
+        if (userForm.password) {
+          updateData.password = userForm.password
+          updateData.confirmPassword = userForm.confirmPassword
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/update/${selectedUser._id}`, {
+          method: "PUT",
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updateData)
+        })
+
+        const result = await response.json()
+        
+        if (result.status) {
+          toast({
+            title: "Success",
+            description: "User updated successfully",
+          })
+          fetchUsers()
+          setIsDialogOpen(false)
+          resetForm()
+        } else {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to update user",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteClick = (user: User) => {
+    setSelectedUser(user)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (!selectedUser) return
+
+    try {
+      const token = localStorage.getItem('token') || document.cookie.split('token=')[1]?.split(';')[0]
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/delete/${selectedUser._id}`, {
+        method: "DELETE",
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const result = await response.json()
+      
+      if (result.status) {
+        toast({
+          title: "Success",
+          description: "User deleted successfully",
+        })
+        setIsDeleteDialogOpen(false)
+        setSelectedUser(null)
+        fetchUsers()
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to delete user",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete user",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /* ================= UI ================= */
+
+  const isViewMode = mode === "view"
+  const filteredUsers = users.filter((u) => {
+    const q = searchQuery.trim().toLowerCase()
+    const matchesQuery =
+      !q ||
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.phone || "").toLowerCase().includes(q) ||
+      (u.roleName || "").toLowerCase().includes(q)
+
+    const matchesStatus = statusFilter === "all" || u.status === statusFilter
+    return matchesQuery && matchesStatus
+  })
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-balance">Users Management</h1>
-        <p className="text-muted-foreground">Manage registered users and their accounts</p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Users Management</h1>
+          <p className="text-muted-foreground">
+            Manage Admins, Captains, Vendors & Roles
+          </p>
+        </div>
+        {hasPermission.create && <Button onClick={openCreate}>Create User</Button>}
       </div>
 
+      {/* Search + Filter */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <div className="flex-1">
               <Input
-                placeholder="Search by name, email, or phone..."
+                placeholder="Search by role, name, email, phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
               <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Account Status" />
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
+      {/* Table */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        <CardContent className="pt-6 overflow-x-auto">
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No users found</div>
+          ) : (
+            <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left p-4 font-medium">Name</th>
-                  <th className="text-left p-4 font-medium">Contact</th>
-                  <th className="text-left p-4 font-medium">Email</th>
-                  <th className="text-left p-4 font-medium">Joining Date</th>
-                  <th className="text-left p-4 font-medium">Status</th>
-                  <th className="text-right p-4 font-medium">Action</th>
+                <tr className="bg-muted/60 border-b">
+                  <th className="p-4 text-left">Role</th>
+                  <th className="p-4 text-left">Name</th>
+                  <th className="p-4 text-left">Email</th>
+                  <th className="p-4 text-left">Phone</th>
+                  <th className="p-4 text-left">Status</th>
+                  <th className="p-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
-                  <tr key={user._id} className="border-b hover:bg-muted/50">
+                {filteredUsers.map((user, index) => (
+                  <tr
+                    key={user._id}
+                    className={index % 2 === 0 ? "bg-background" : "bg-muted/30"}
+                  >
+                    <td className="p-4 font-medium">{user.roleName}</td>
+                    <td className="p-4">{user.name}</td>
+                    <td className="p-4">{user.email}</td>
+                    <td className="p-4">{user.phone}</td>
                     <td className="p-4">
-                      <div className="font-medium">{user.name}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm">{user.phone}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm">{user.email}</div>
-                    </td>
-                    <td className="p-4">{formatDate(user.createdAt)}</td>
-                    <td className="p-4">
-                      <Badge variant={user.status === "Active" ? "default" : "destructive"}>
+                      <Badge
+                        variant={
+                          user.status === "Active"
+                            ? "default"
+                            : "destructive"
+                        }
+                      >
                         {user.status}
                       </Badge>
                     </td>
                     <td className="p-4">
-                      <div className="flex justify-end">
-                        <Button variant="ghost" size="icon" onClick={() => handleViewDetails(user)} title="View Details">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openView(user)}
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
+                   {hasPermission.update &&     <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openEdit(user)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>}
+                        {hasPermission.delete && user.roleName !== "Super Admin" && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDeleteClick(user)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* User Details Dialog - INCREASED WIDTH TO max-w-7xl */}
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+      {/* Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>User Details</DialogTitle>
-            <DialogDescription>Complete information about this user and their booking history</DialogDescription>
+            <DialogTitle>
+              {mode === "view"
+                ? "View User"
+                : mode === "edit"
+                ? "Edit User"
+                : "Create User"}
+            </DialogTitle>
+            <DialogDescription>
+              User basic information and role assignment
+            </DialogDescription>
           </DialogHeader>
 
-          {selectedUser && (
-            <div className="space-y-6">
-              {/* User Information */}
-              <div className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <UserIcon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Name:</span>
-                      <span className="text-sm font-semibold">{selectedUser.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Email:</span>
-                      <span className="text-sm font-medium">{selectedUser.email}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Contact:</span>
-                      <span className="text-sm font-medium">{selectedUser.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Joined Date:</span>
-                      <span className="text-sm font-medium">{formatDate(selectedUser.createdAt)}</span>
-                    </div>
-                    {selectedUser.lastLogin && (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Last Login:</span>
-                        <span className="text-sm font-medium">{formatDate(selectedUser.lastLogin)}</span>
-                      </div>
-                    )}
-                  </div>
-                  <Badge variant={selectedUser.status === "Active" ? "default" : "destructive"} className="text-sm">
-                    {selectedUser.status}
-                  </Badge>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Statistics */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium flex items-center gap-2">
-                      <ShoppingBag className="h-3 w-3 text-muted-foreground" />
-                      Total Bookings
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold">{selectedUser.totalBookings}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium flex items-center gap-2">
-                      <DollarSign className="h-3 w-3 text-muted-foreground" />
-                      Total Spent
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold">₹{selectedUser.totalSpent.toLocaleString()}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium flex items-center gap-2">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                      Avg. per Booking
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-bold">
-                      ₹{selectedUser.totalBookings > 0 ? Math.round(selectedUser.totalSpent / selectedUser.totalBookings).toLocaleString() : 0}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Separator />
-
-              {/* Booking History */}
-              <div>
-                <h3 className="text-base font-semibold mb-3">Booking History</h3>
-                {selectedUser.bookingHistory.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2 text-xs font-medium">Booking ID</th>
-                          <th className="text-left p-2 text-xs font-medium">Package</th>
-                          <th className="text-left p-2 text-xs font-medium">Guests</th>
-                          <th className="text-left p-2 text-xs font-medium">Trip Date</th>
-                          <th className="text-left p-2 text-xs font-medium">Amount</th>
-                          <th className="text-left p-2 text-xs font-medium">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedUser.bookingHistory.map((booking) => (
-                          <tr key={booking.bookingId} className="border-b hover:bg-muted/50">
-                            <td className="p-2 font-mono text-xs">
-                              {booking.bookingId.slice(-8).toUpperCase()}
-                            </td>
-                            <td className="p-2 text-sm">{booking.packageName}</td>
-                            <td className="p-2 text-sm">{booking.totalGuests}</td>
-                            <td className="p-2 text-sm">{formatDate(booking.tripDate)}</td>
-                            <td className="p-2 text-sm font-medium">₹{booking.totalAmount.toLocaleString()}</td>
-                            <td className="p-2">
-                              <Badge
-                                variant={
-                                  booking.status === "Active"
-                                    ? "default"
-                                    : booking.status === "Pending"
-                                      ? "secondary"
-                                      : "destructive"
-                                }
-                              >
-                                {booking.status}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">No bookings found for this user</div>
-                )}
-              </div>
+          <div className="space-y-4">
+            {/* Role */}
+            <div>
+              <Label>Role Name</Label>
+              <Select
+                disabled={isViewMode}
+                value={userForm.roleName}
+                onValueChange={(value) => {
+                  setUserForm({ ...userForm, roleName: value })
+                  setErrors((prev) => ({ ...prev, roleName: "" }))
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role._id} value={role.name}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!!errors.roleName && <p className="text-sm text-red-600 mt-1">{errors.roleName}</p>}
             </div>
+
+            {/* Password - Only show in create mode */}
+        
+
+            {/* Name */}
+            <div>
+              <Label>Name</Label>
+              <Input
+                disabled={isViewMode}
+                value={userForm.name}
+                onChange={(e) =>
+                  setUserForm({ ...userForm, name: e.target.value })
+                }
+              />
+              {!!errors.name && <p className="text-sm text-red-600 mt-1">{errors.name}</p>}
+            </div>
+
+            {/* Email */}
+            <div>
+              <Label>Email</Label>
+              <Input
+                disabled={isViewMode}
+                value={userForm.email}
+                onChange={(e) =>
+                  setUserForm({ ...userForm, email: e.target.value })
+                }
+              />
+              {!!errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
+            </div>
+
+            {/* Phone */}
+            <div>
+              <Label>Phone</Label>
+              <Input
+                disabled={isViewMode}
+                value={userForm.phone}
+                onChange={(e) =>
+                  setUserForm({ ...userForm, phone: e.target.value })
+                }
+              />
+              {!!errors.phone && <p className="text-sm text-red-600 mt-1">{errors.phone}</p>}
+            </div>
+
+            {/* Password - Show in create and edit mode */}
+            {(mode === "create" || mode === "edit") && (
+              <>
+                <div>
+                  <Label>Password</Label>
+                  <Input
+                    type="password"
+                    disabled={isViewMode}
+                    value={userForm.password}
+                    onChange={(e) =>
+                      setUserForm({ ...userForm, password: e.target.value })
+                    }
+                    placeholder={mode === "create" ? "Enter password" : "Enter new password"}
+                  />
+                  {!!errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
+                </div>
+
+                {mode === "create" && (
+                  <div>
+                    <Label>Confirm Password</Label>
+                    <Input
+                      type="password"
+                      disabled={isViewMode}
+                      value={userForm.confirmPassword}
+                      onChange={(e) =>
+                        setUserForm({ ...userForm, confirmPassword: e.target.value })
+                      }
+                      placeholder="Confirm password"
+                    />
+                    {!!errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
+                  </div>
+                )}
+                {mode === "edit"  && (
+                  <div>
+                    <Label>Confirm Password</Label>
+                    <Input
+                      type="password"
+                      disabled={isViewMode}
+                      value={userForm.confirmPassword}
+                      onChange={(e) =>
+                        setUserForm({ ...userForm, confirmPassword: e.target.value })
+                      }
+                      placeholder="Confirm password"
+                    />
+                    {!!errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Status - Only show in edit/view mode (Super Admin हमेशा Active रहेगा) */}
+            {mode !== "create" && userForm.roleName !== "Super Admin" && (
+              <div>
+                <Label>Status</Label>
+                <Select
+                  disabled={isViewMode}
+                  value={userForm.status}
+                  onValueChange={(value) =>
+                    setUserForm({
+                      ...userForm,
+                      status: value as Status,
+                    })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {mode !== "view" && (
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSave}>
+                {mode === "edit" ? "Update" : "Create"}
+              </Button>
+            </DialogFooter>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedUser?.name}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -12,6 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { API_BASE_URL } from "@/lib/config"
+import { TableRowSkeleton } from "@/components/ui/skeletons"
+import { useSelector } from "react-redux"
+import { RootState } from "@/components/redux/store"
 
 interface Captain {
   _id: string
@@ -29,9 +32,28 @@ interface Captain {
   createdAt: string
 }
 
+type Permission = {
+  module: string;
+  create: boolean;
+  read?: boolean;
+  update?: boolean;
+  delete?: boolean;
+};
+
+type CaptainPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
 const API_BASE = `${API_BASE_URL}/api/admin/captain`
 
 export function CaptainDetailsTab() {
+
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
+
   const router = useRouter()
   const [captains, setCaptains] = useState<Captain[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,6 +63,26 @@ export function CaptainDetailsTab() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const { toast } = useToast()
+
+  const [hasPermission, setHasPermission] = useState<CaptainPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  });
+
+  useEffect(() => {
+    const captainPermission = permissions.find(
+      (p: Permission) => p.module === "captain_details"
+    );
+  
+    setHasPermission({
+      create: captainPermission?.create ?? false,
+      update: captainPermission?.update ?? false,
+      delete: captainPermission?.delete ?? false,
+    });
+  }, []);
+  
+
 
   useEffect(() => {
     fetchCaptains()
@@ -157,10 +199,10 @@ export function CaptainDetailsTab() {
           <h2 className="text-2xl font-bold">Captain Details</h2>
           <p className="text-sm text-muted-foreground">View and manage all captains</p>
         </div>
-        <Button onClick={() => router.push("/admin/captain/new")}>
+       {hasPermission.create &&  <Button onClick={() => router.push("/admin/captain/new")}>
           <Plus className="h-4 w-4 mr-2" />
           Add Captain
-        </Button>
+        </Button>}
       </div>
 
       <Card>
@@ -178,7 +220,26 @@ export function CaptainDetailsTab() {
           </div>
 
           {loading ? (
-            <div className="text-center py-8">Loading captains...</div>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Captain</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Experience</TableHead>
+                    <TableHead>Specialization</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <TableRowSkeleton key={`captain-skeleton-${index}`} columns={7} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : captains.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No captains found</div>
           ) : (
@@ -224,14 +285,15 @@ export function CaptainDetailsTab() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button
+                           {hasPermission.update && <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => router.push(`/admin/captain/${captain._id}?mode=edit`)}
                               title="Edit"
                             >
                               <Edit className="h-4 w-4" />
-                            </Button>
+                            </Button>}
+                            {hasPermission.delete && 
                             <Button
                               variant="ghost"
                               size="sm"
@@ -242,7 +304,7 @@ export function CaptainDetailsTab() {
                               title="Delete"
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            </Button>}
                           </div>
                         </TableCell>
                       </TableRow>

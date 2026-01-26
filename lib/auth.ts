@@ -21,17 +21,6 @@ export function hasPermission(userRole: UserRole, requiredRole: UserRole): boole
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole]
 }
 
-export function canAccessFeature(userRole: UserRole, feature: string): boolean {
-  const permissions: Record<UserRole, string[]> = {
-    super_admin: ["*"], // Access to everything
-    admin: ["*"], // Admin has full access
-    content_manager: ["trips", "content", "dashboard", "notifications"],
-    customer_support: ["bookings", "users", "dashboard", "notifications"],
-  }
-
-  const userPermissions = permissions[userRole]
-  return userPermissions.includes("*") || userPermissions.includes(feature)
-}
 
 import { API_BASE_URL } from './config'
 

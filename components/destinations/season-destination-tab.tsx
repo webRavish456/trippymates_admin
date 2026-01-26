@@ -13,13 +13,18 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { API_BASE_URL } from "@/lib/config"
+import { TableRowSkeleton } from "@/components/ui/skeletons"
+import { useSelector } from "react-redux"
+import { RootState } from "@/components/redux/store"
 
 interface SeasonDestination {
   _id: string
   title: string
   color: string
   places: string
-  location: string
+  placesSummary?: string
   desc: string
   image: string
   type: "season"
@@ -28,15 +33,37 @@ interface SeasonDestination {
   placesDetails?: any[]
 }
 
-import { API_BASE_URL } from "@/lib/config"
-
 const API_BASE = `${API_BASE_URL}/api/admin/destination`
 
+type Permission = {
+  module: string;
+  create: boolean;
+  read?: boolean;
+  update?: boolean;
+  delete?: boolean;
+};
+
+type ExploreDestinationPermission = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
 export function SeasonDestinationTab() {
+  const permissions = useSelector(
+    (state: RootState) => state.permission.permissions
+  )
   const router = useRouter()
+  const [hasPermission, setHasPermission] = useState<ExploreDestinationPermission>({
+    create: false,
+    update: false,
+    delete: false,
+  })
   const [destinations, setDestinations] = useState<SeasonDestination[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedDestination, setSelectedDestination] = useState<SeasonDestination | null>(null)
@@ -44,7 +71,19 @@ export function SeasonDestinationTab() {
 
   useEffect(() => {
     fetchDestinations()
+    setCurrentPage(1) // Reset to first page when search changes
   }, [searchQuery])
+
+  useEffect(() => {
+    const seasonDestinationPermission = permissions.find(
+      (p: Permission) => p.module === "explore_destination"
+    )
+    setHasPermission({
+      create: seasonDestinationPermission?.create ?? false,
+      update: seasonDestinationPermission?.update ?? false,
+      delete: seasonDestinationPermission?.delete ?? false,
+    })
+  }, [])
 
   const fetchDestinations = async () => {
     try {
@@ -60,11 +99,8 @@ export function SeasonDestinationTab() {
       }
     } catch (error) {
       console.error("Fetch error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch destinations",
-        variant: "destructive",
-      })
+      setDestinations([])
+      // Don't show toast for GET requests
     } finally {
       setLoading(false)
     }
@@ -105,23 +141,46 @@ export function SeasonDestinationTab() {
       const response = await fetch(`${API_BASE}/${destination._id}`)
       const result = await response.json()
       if (result.status || result.success) {
-        setSelectedDestination(result.data)
+        // Ensure placesDetails is an array
+        const data = { ...result.data }
+        if (data.placesDetails) {
+          if (!Array.isArray(data.placesDetails)) {
+            // Convert object to array if it's an object
+            // Filter out non-numeric keys to get only the array items
+            if (typeof data.placesDetails === 'object' && data.placesDetails !== null) {
+              const values = Object.values(data.placesDetails)
+              // Filter to ensure we only have valid place objects (with placeName property)
+              data.placesDetails = values.filter((item: any) => item && typeof item === 'object' && (item.placeName || item.name))
+            } else {
+              data.placesDetails = []
+            }
+          }
+        }
+        setSelectedDestination(data)
         setIsDetailsDialogOpen(true)
       }
     } catch (error) {
       console.error("Fetch error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch destination details",
-        variant: "destructive",
-      })
+      // Don't show toast for GET requests
     }
   }
 
   const filteredDestinations = destinations.filter((dest) =>
     dest.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    dest.places?.toLowerCase().includes(searchQuery.toLowerCase())
+    dest.places?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    dest.placesSummary?.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredDestinations.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedDestinations = filteredDestinations.slice(startIndex, endIndex)
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   return (
     <div className="space-y-4">
@@ -130,10 +189,10 @@ export function SeasonDestinationTab() {
           <h2 className="text-2xl font-bold">Season Destinations</h2>
           <p className="text-sm text-muted-foreground">Manage monthly/seasonal travel destinations</p>
         </div>
-        <Button onClick={() => router.push("/admin/explore-destination/season/new")}>
+        {hasPermission.create && <Button onClick={() => router.push("/admin/explore-destination/season/new")}>
           <Plus className="h-4 w-4 mr-2" />
           Add Season Destination
-        </Button>
+        </Button>}
       </div>
 
       <Card>
@@ -152,34 +211,54 @@ export function SeasonDestinationTab() {
         </CardContent>
       </Card>
 
-      {loading ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Loading destinations...
-          </CardContent>
-        </Card>
-      ) : filteredDestinations.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            No destinations found. Create your first season destination!
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <Table>
-            <TableHeader>
+      {(() => {
+        if (loading) {
+          return (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Season</TableHead>
+                    <TableHead>Best Time</TableHead>
+                    <TableHead>Activities</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <TableRowSkeleton key={`skeleton-${index}`} columns={5} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )
+        }
+        if (filteredDestinations.length === 0) {
+          return (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                No destinations found. Create your first season destination!
+              </CardContent>
+            </Card>
+          )
+        }
+        return (
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+              <TableHeader>
               <TableRow>
                 <TableHead className="w-20">Image</TableHead>
                 <TableHead className="w-32">Month</TableHead>
                 <TableHead className="w-32">Places</TableHead>
-                <TableHead className="min-w-[200px]">Location</TableHead>
                 <TableHead className="min-w-[250px]">Description</TableHead>
                 <TableHead className="w-24">Status</TableHead>
                 <TableHead className="text-right w-32">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredDestinations.map((destination) => (
+              {paginatedDestinations.map((destination) => (
                 <TableRow key={destination._id}>
                   <TableCell className="w-20">
                     {destination.image ? (
@@ -195,12 +274,7 @@ export function SeasonDestinationTab() {
                     )}
                   </TableCell>
                   <TableCell className="w-32 font-medium">{destination.title}</TableCell>
-                  <TableCell className="w-32">{destination.places || "N/A"}</TableCell>
-                  <TableCell className="min-w-[200px] max-w-[300px]">
-                    <span className="truncate block" title={destination.location || "N/A"}>
-                      {destination.location || "N/A"}
-                    </span>
-                  </TableCell>
+                  <TableCell className="w-32">{destination.placesSummary || destination.places || "N/A"}</TableCell>
                   <TableCell className="min-w-[250px] max-w-[350px]">
                     {destination.desc ? (
                       <span className="text-sm" title={destination.desc}>
@@ -226,14 +300,14 @@ export function SeasonDestinationTab() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button
+                      {hasPermission.update && <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => router.push(`/admin/explore-destination/season/${destination._id}`)}
                       >
                         <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
+                      </Button>}
+                      {hasPermission.delete && <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => {
@@ -242,15 +316,67 @@ export function SeasonDestinationTab() {
                         }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      </Button>}
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </Card>
-      )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-6 pb-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    if (
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return (
+                        <PaginationItem key={page}>
+                          <span className="px-3 py-2">...</span>
+                        </PaginationItem>
+                      )
+                    }
+                    return null
+                  })}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Details View Dialog */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
@@ -264,27 +390,30 @@ export function SeasonDestinationTab() {
                 <h3 className="font-semibold mb-2">Description</h3>
                 <p className="text-sm text-muted-foreground">{selectedDestination.desc}</p>
               </div>
-              <div>
-                <h3 className="font-semibold mb-2">Location</h3>
-                <p className="text-sm text-muted-foreground">{selectedDestination.location || selectedDestination.places}</p>
-              </div>
-              {selectedDestination.placesDetails && selectedDestination.placesDetails.length > 0 && (
+              {selectedDestination.placesDetails && Array.isArray(selectedDestination.placesDetails) && selectedDestination.placesDetails.length > 0 && (
                 <div>
                   <h3 className="font-semibold mb-4">Place Details</h3>
                   <Tabs defaultValue="0" className="w-full">
                     <TabsList className="flex w-fit flex-wrap gap-2 ">
-                      {selectedDestination.placesDetails.map((place: any, index: number) => (
+                      {selectedDestination.placesDetails
+                        .filter((place: any) => place && typeof place === 'object' && (place.placeName || place.name))
+                        .map((place: any, index: number) => (
                         <TabsTrigger key={index} value={String(index)} className="whitespace-nowrap">
-                          {place.placeName || `Place ${index + 1}`}
+                          {place.placeName || place.name || `Place ${index + 1}`}
                         </TabsTrigger>
                       ))}
                     </TabsList>
-                    {selectedDestination.placesDetails.map((place: any, index: number) => (
+                    {selectedDestination.placesDetails
+                      .filter((place: any) => place && typeof place === 'object' && (place.placeName || place.name))
+                      .map((place: any, index: number) => (
                       <TabsContent key={index} value={String(index)} className="mt-4">
                         <div className="border rounded-lg p-6 space-y-6">
                         <div>
-                          <h4 className="text-xl font-bold mb-2">{place.placeName}</h4>
-                          {place.images && place.images.length > 0 && (
+                          <h4 className="text-xl font-bold mb-2">{place.placeName || place.name || 'Place'}</h4>
+                          {place.location && (
+                            <p className="text-sm text-muted-foreground mb-4">📍 {place.location}</p>
+                          )}
+                          {place.images && Array.isArray(place.images) && place.images.length > 0 && (
                             <div className="grid grid-cols-2 gap-2 mb-4">
                               {place.images.slice(0, 2).map((image: string, imgIdx: number) => (
                                 <img
@@ -305,7 +434,7 @@ export function SeasonDestinationTab() {
                           </div>
                         )}
 
-                        {place.topAttractions && place.topAttractions.length > 0 && (
+                        {place.topAttractions && Array.isArray(place.topAttractions) && place.topAttractions.length > 0 && (
                           <div>
                             <h5 className="font-semibold mb-3">Top Attractions</h5>
                             <Carousel className="w-full">
@@ -340,7 +469,7 @@ export function SeasonDestinationTab() {
                           </div>
                         )}
 
-                        {place.food && place.food.length > 0 && (
+                        {place.food && Array.isArray(place.food) && place.food.length > 0 && (
                           <div>
                             <h5 className="font-semibold mb-3">Food & Local Cuisine</h5>
                             <Carousel className="w-full">
@@ -378,7 +507,7 @@ export function SeasonDestinationTab() {
                           </div>
                         )}
 
-                        {place.hotels && place.hotels.length > 0 && (
+                        {place.hotels && Array.isArray(place.hotels) && place.hotels.length > 0 && (
                           <div>
                             <h5 className="font-semibold mb-3">Hotels</h5>
                             <Carousel className="w-full">
@@ -427,7 +556,7 @@ export function SeasonDestinationTab() {
                           </div>
                         )}
 
-                        {place.activities && place.activities.length > 0 && (
+                        {place.activities && Array.isArray(place.activities) && place.activities.length > 0 && (
                           <div>
                             <h5 className="font-semibold mb-3">Activities & Experiences</h5>
                             <Carousel className="w-full">
@@ -473,7 +602,7 @@ export function SeasonDestinationTab() {
                           </div>
                         )}
 
-                        {place.eventsFestivals && place.eventsFestivals.length > 0 && (
+                        {place.eventsFestivals && Array.isArray(place.eventsFestivals) && place.eventsFestivals.length > 0 && (
                           <div>
                             <h5 className="font-semibold mb-3">Events & Festivals</h5>
                             <Carousel className="w-full">
@@ -519,7 +648,7 @@ export function SeasonDestinationTab() {
                           </div>
                         )}
 
-                        {place.nearbyDestinations && place.nearbyDestinations.length > 0 && (
+                        {place.nearbyDestinations && Array.isArray(place.nearbyDestinations) && place.nearbyDestinations.length > 0 && (
                           <div>
                             <h5 className="font-semibold mb-3">Nearby Destinations</h5>
                             <Carousel className="w-full">
