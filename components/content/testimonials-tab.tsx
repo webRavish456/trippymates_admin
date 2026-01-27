@@ -7,6 +7,16 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -59,6 +69,8 @@ export function TestimonialsTab() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [testimonialToDelete, setTestimonialToDelete] = useState<string | null>(null)
   const [selectedTestimonial, setSelectedTestimonial] = useState<Testimonial | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -258,12 +270,17 @@ export function TestimonialsTab() {
     }
   }
 
-  const handleDeleteTestimonial = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this testimonial?")) return
+  const handleDeleteClick = (id: string) => {
+    setTestimonialToDelete(id)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteTestimonial = async () => {
+    if (!testimonialToDelete) return
 
     try {
       const token = localStorage.getItem('adminToken')
-      const response = await fetch(`${API_BASE_URL}/api/admin/deleteTestimonial/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/deleteTestimonial/${testimonialToDelete}`, {
         method: "DELETE",
         headers: {
           'Authorization': `Bearer ${token}`
@@ -277,6 +294,8 @@ export function TestimonialsTab() {
           title: "Success",
           description: "Testimonial deleted successfully",
         })
+        setIsDeleteDialogOpen(false)
+        setTestimonialToDelete(null)
         fetchTestimonials()
       } else {
         throw new Error(result.message || "Failed to delete testimonial")
@@ -287,6 +306,9 @@ export function TestimonialsTab() {
         description: error.message || "Failed to delete testimonial",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setTestimonialToDelete(null)
     }
   }
 
@@ -451,7 +473,7 @@ export function TestimonialsTab() {
                           {hasPermission.update && <Button variant="ghost" size="sm" onClick={() => openEditDialog(testimonial)}>
                             <Edit className="h-4 w-4" />
                           </Button>}
-                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteTestimonial(testimonial._id)}>
+                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(testimonial._id)}>
                             <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>}
                          
@@ -784,6 +806,32 @@ export function TestimonialsTab() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Testimonial</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this testimonial? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setTestimonialToDelete(null)
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTestimonial}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

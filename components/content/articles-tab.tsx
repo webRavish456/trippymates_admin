@@ -7,6 +7,16 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -60,6 +70,8 @@ export function ArticlesTab() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [articleToDelete, setArticleToDelete] = useState<string | null>(null)
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -266,11 +278,16 @@ export function ArticlesTab() {
     }
   }
 
-  const handleDeleteArticle = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this article?")) return
+  const handleDeleteClick = (id: string) => {
+    setArticleToDelete(id)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteArticle = async () => {
+    if (!articleToDelete) return
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/deleteArticle/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/deleteArticle/${articleToDelete}`, {
         method: "DELETE",
       })
 
@@ -281,6 +298,8 @@ export function ArticlesTab() {
           title: "Success",
           description: "Article deleted successfully",
         })
+        setIsDeleteDialogOpen(false)
+        setArticleToDelete(null)
         fetchArticles()
       } else {
         throw new Error(result.message || "Failed to delete article")
@@ -291,6 +310,9 @@ export function ArticlesTab() {
         description: error.message || "Failed to delete article",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setArticleToDelete(null)
     }
   }
 
@@ -450,7 +472,7 @@ export function ArticlesTab() {
                           {hasPermission.update && <Button variant="ghost" size="sm" onClick={() => openEditDialog(article)}>
                             <Edit className="h-4 w-4" />
                           </Button>}
-                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteArticle(article._id)}>
+                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(article._id)}>
                             <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>}
                         </div>
@@ -734,6 +756,32 @@ export function ArticlesTab() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Article</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this article? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setArticleToDelete(null)
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteArticle}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

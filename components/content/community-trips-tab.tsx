@@ -8,6 +8,16 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -85,6 +95,8 @@ export function CommunityTripsTab() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [tripToDelete, setTripToDelete] = useState<string | null>(null)
   const [selectedTrip, setSelectedTrip] = useState<CommunityTrip | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -379,12 +391,17 @@ export function CommunityTripsTab() {
     }
   }
 
-  const handleDeleteTrip = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this trip?")) return
+  const handleDeleteClick = (id: string) => {
+    setTripToDelete(id)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteTrip = async () => {
+    if (!tripToDelete) return
 
     try {
       const token = localStorage.getItem('adminToken')
-      const response = await fetch(`${API_BASE_URL}/api/admin/community-trip/delete/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/community-trip/delete/${tripToDelete}`, {
         method: "DELETE",
         headers: {
           'Authorization': `Bearer ${token}`
@@ -398,6 +415,8 @@ export function CommunityTripsTab() {
           title: "Success",
           description: "Trip deleted successfully",
         })
+        setIsDeleteDialogOpen(false)
+        setTripToDelete(null)
         fetchTrips()
       } else {
         toast({
@@ -413,6 +432,9 @@ export function CommunityTripsTab() {
         description: "Failed to delete trip",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setTripToDelete(null)
     }
   }
 
@@ -659,7 +681,7 @@ export function CommunityTripsTab() {
                           {hasPermission.delete && <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDeleteTrip(trip._id)}
+                            onClick={() => handleDeleteClick(trip._id)}
                             title="Delete trip"
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -1230,6 +1252,32 @@ export function CommunityTripsTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Community Trip</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this trip? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setTripToDelete(null)
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTrip}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

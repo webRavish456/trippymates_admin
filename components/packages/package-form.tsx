@@ -550,7 +550,8 @@ export function PackageForm({ initialData, isEdit = false }: PackageFormProps) {
   }
 
   const handleDeleteCategory = (categoryId: string) => {
-    if (confirm("Are you sure you want to delete this category?")) {
+    // Show toast instead of confirm
+    if (true) { // Always proceed, toast will show success
       const updatedCategories = packageCategories.filter(cat => cat.id !== categoryId)
       setPackageCategories(updatedCategories)
       // Save to localStorage

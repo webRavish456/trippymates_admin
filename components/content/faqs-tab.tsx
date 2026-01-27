@@ -4,9 +4,20 @@ import { useState, useEffect } from "react"
 import { Plus, Search, Edit, Trash2, Eye, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -55,6 +66,8 @@ export function FAQsTab() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [faqToDelete, setFaqToDelete] = useState<string | null>(null)
   const [selectedFAQ, setSelectedFAQ] = useState<FAQ | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -213,12 +226,17 @@ export function FAQsTab() {
     }
   }
 
-  const handleDeleteFAQ = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this FAQ?")) return
+  const handleDeleteClick = (id: string) => {
+    setFaqToDelete(id)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteFAQ = async () => {
+    if (!faqToDelete) return
 
     try {
       const token = localStorage.getItem('adminToken')
-      const response = await fetch(`${API_BASE_URL}/api/admin/deleteFAQ/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/deleteFAQ/${faqToDelete}`, {
         method: "DELETE",
         headers: {
           'Authorization': `Bearer ${token}`
@@ -232,6 +250,8 @@ export function FAQsTab() {
           title: "Success",
           description: "FAQ deleted successfully",
         })
+        setIsDeleteDialogOpen(false)
+        setFaqToDelete(null)
         fetchFAQs()
       } else {
         throw new Error(result.message || "Failed to delete FAQ")
@@ -242,6 +262,9 @@ export function FAQsTab() {
         description: error.message || "Failed to delete FAQ",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setFaqToDelete(null)
     }
   }
 
@@ -367,7 +390,7 @@ export function FAQsTab() {
                           {hasPermission.update && <Button variant="ghost" size="sm" onClick={() => openEditDialog(faq)}>
                             <Edit className="h-4 w-4" />
                           </Button>}
-                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteFAQ(faq._id)}>
+                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(faq._id)}>
                             <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>}
                         </div>
@@ -586,6 +609,31 @@ export function FAQsTab() {
           )}
         </DialogContent>
       </Dialog>
+          
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete FAQ</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this FAQ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setFaqToDelete(null)
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteFAQ}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { useSelector } from "react-redux"
 import { RootState } from "@/components/redux/store"
+import { API_BASE_URL } from "@/lib/config"
 type SettingsPermission = {
   create: boolean;
   update: boolean;
@@ -70,10 +71,18 @@ export default function SettingsPage() {
 
   const fetchEmailSettings = async () => {
     try {
-      // TODO: Replace with actual API endpoint
-      // const response = await fetch('/api/admin/settings/email')
-      // const data = await response.json()
-      // if (data.success) setEmailSettings(data.data)
+      const token = localStorage.getItem('token') || localStorage.getItem('adminToken')
+      const response = await fetch(`${API_BASE_URL}/api/admin/settings/email`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      const data = await response.json()
+      if (data.status && data.data) {
+        setEmailSettings(data.data)
+      }
     } catch (error) {
       console.error("Error fetching email settings:", error)
     }
@@ -81,10 +90,18 @@ export default function SettingsPage() {
 
   const fetchRazorpaySettings = async () => {
     try {
-      // TODO: Replace with actual API endpoint
-      // const response = await fetch('/api/admin/settings/razorpay')
-      // const data = await response.json()
-      // if (data.success) setRazorpaySettings(data.data)
+      const token = localStorage.getItem('token') || localStorage.getItem('adminToken')
+      const response = await fetch(`${API_BASE_URL}/api/admin/settings/razorpay`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      const data = await response.json()
+      if (data.status && data.data) {
+        setRazorpaySettings(data.data)
+      }
     } catch (error) {
       console.error("Error fetching Razorpay settings:", error)
     }
@@ -93,21 +110,32 @@ export default function SettingsPage() {
   const handleSaveEmailSettings = async () => {
     setIsSaving(true)
     try {
-      // TODO: Replace with actual API endpoint
-      // await fetch('/api/admin/settings/email', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(emailSettings)
-      // })
-      
-      toast({
-        title: "Success",
-        description: "Email settings saved successfully",
+      const token = localStorage.getItem('token') || localStorage.getItem('adminToken')
+      const response = await fetch(`${API_BASE_URL}/api/admin/settings/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(emailSettings)
       })
-    } catch (error) {
+      
+      const data = await response.json()
+      
+      if (data.status) {
+        toast({
+          title: "Success",
+          description: "Email settings saved successfully",
+        })
+        // Refresh settings after save
+        await fetchEmailSettings()
+      } else {
+        throw new Error(data.message || "Failed to save email settings")
+      }
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to save email settings",
+        description: error.message || "Failed to save email settings",
         variant: "destructive",
       })
     } finally {
@@ -118,21 +146,32 @@ export default function SettingsPage() {
   const handleSaveRazorpaySettings = async () => {
     setIsSaving(true)
     try {
-      // TODO: Replace with actual API endpoint
-      // await fetch('/api/admin/settings/razorpay', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(razorpaySettings)
-      // })
-      
-      toast({
-        title: "Success",
-        description: "Razorpay settings saved successfully",
+      const token = localStorage.getItem('token') || localStorage.getItem('adminToken')
+      const response = await fetch(`${API_BASE_URL}/api/admin/settings/razorpay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(razorpaySettings)
       })
-    } catch (error) {
+      
+      const data = await response.json()
+      
+      if (data.status) {
+        toast({
+          title: "Success",
+          description: "Razorpay settings saved successfully",
+        })
+        // Refresh settings after save
+        await fetchRazorpaySettings()
+      } else {
+        throw new Error(data.message || "Failed to save Razorpay settings")
+      }
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to save Razorpay settings",
+        description: error.message || "Failed to save Razorpay settings",
         variant: "destructive",
       })
     } finally {

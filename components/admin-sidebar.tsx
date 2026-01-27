@@ -94,16 +94,23 @@ const navigation: NavItem[] = [
     ],
   },
 
-  { name: "Blog Posts", href: "/admin/content?tab=blog", icon: FileText, module: "blog_posts" },
-  { name: "Articles", href: "/admin/content?tab=articles", icon: FileText, module: "articles" },
-  { name: "Testimonials", href: "/admin/content?tab=testimonials", icon: FileText, module: "testimonials" },
-  { name: "FAQ", href: "/admin/content?tab=faqs", icon: FileText, module: "faq" },
+  {
+    name: "Content",
+    icon: FileText,
+    href: "/admin/content?tab=blog",
+    module: "content"
+  },
+
   { name: "Notifications", href: "/admin/notifications", icon: Bell, module: "notifications" },
-  { name: "Income", href: "/admin/reports?tab=income", icon: BarChart3, module: "income" },
-  { name: "Expense", href: "/admin/reports?tab=expense", icon: BarChart3, module: "expense" },
-  { name: "Trip Report", href: "/admin/reports?tab=trip", icon: BarChart3, module: "trip_report" },
-  { name: "Vendor Report", href: "/admin/reports?tab=vendors", icon: BarChart3, module: "vendor_report" },
-  { name: "Captains Report", href: "/admin/reports?tab=captains", icon: BarChart3, module: "captains_report" },
+
+
+  {
+    name: "Report",
+    icon: BarChart3,
+    href: "/admin/reports?tab=income",
+    module: "report"
+  },
+
   { name: "Settings", href: "/admin/settings", icon: Settings, module: "settings" },
 ]
 

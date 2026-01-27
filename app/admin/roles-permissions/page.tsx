@@ -58,16 +58,9 @@ const PERMISSIONS: PermissionConfig[] = [
   { key: "coupon_management", label: "Coupon Management", readOnly: true },
   { key: "promo_details", label: "Promo Details" },
   { key: "promo_management", label: "Promo Management", readOnly: true },
-  { key: "blog_posts", label: "Blog Posts" },
-  { key: "articles", label: "Articles" },
-  { key: "testimonials", label: "Testimonials" },
-  { key: "faq", label: "FAQ" },
+  { key: "content", label: "Content" },
   { key: "notifications", label: "Notifications", readOnly: true },
-  { key: "income", label: "Income", readOnly: true },
-  { key: "expense", label: "Expense", readOnly: true },
-  { key: "trip_report", label: "Trip Report", readOnly: true },
-  { key: "vendor_report", label: "Vendor Report", readOnly: true },
-  { key: "captains_report", label: "Captains Report", readOnly: true },
+  { key: "report", label: "Report", readOnly: true },
   { key: "settings", label: "Settings", noDelete: true },
 ]
 
@@ -487,8 +480,10 @@ export default function RolesAndPermissionsPage() {
           (normalizedInputName === "super admin" && normalizedRoleName === "admin") ||
           (normalizedInputName === "admin" && normalizedRoleName === "super admin")
         
-        return (isExactMatch || isSuperAdminAdminConflict) && 
-               (!selectedRole || r._id !== selectedRole._id)
+        // When editing, exclude the current role from duplicate check
+        const isCurrentRole = selectedRole && String(r._id) === String(selectedRole._id)
+        
+        return (isExactMatch || isSuperAdminAdminConflict) && !isCurrentRole
       }
     )
     

@@ -7,6 +7,16 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -67,6 +77,8 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [blogToDelete, setBlogToDelete] = useState<string | null>(null)
   const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -290,11 +302,16 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
     }
   }
 
-  const handleDeleteBlog = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this blog?")) return
+  const handleDeleteClick = (id: string) => {
+    setBlogToDelete(id)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteBlog = async () => {
+    if (!blogToDelete) return
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/deleteBlog/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/deleteBlog/${blogToDelete}`, {
         method: "DELETE",
       })
 
@@ -305,6 +322,8 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
           title: "Success",
           description: "Blog deleted successfully",
         })
+        setIsDeleteDialogOpen(false)
+        setBlogToDelete(null)
         fetchBlogs()
       } else {
         throw new Error(result.message || "Failed to delete blog")
@@ -315,6 +334,9 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
         description: error.message || "Failed to delete blog",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setBlogToDelete(null)
     }
   }
 
@@ -487,7 +509,7 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
                           {hasPermission.update && <Button variant="ghost" size="sm" onClick={() => openEditDialog(blog)}>
                             <Edit className="h-4 w-4" />
                           </Button>}
-                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteBlog(blog._id)}>
+                          {hasPermission.delete && <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(blog._id)}>
                             <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>}
                         </div>
@@ -874,6 +896,32 @@ export function BlogPostsTab({ sectionType = "main" }: BlogPostsTabProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Blog Post</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this blog post? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setBlogToDelete(null)
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBlog}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

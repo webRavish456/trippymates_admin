@@ -7,6 +7,7 @@ import { BlogPostsTab } from "@/components/content/blog-posts-tab"
 import { ArticlesTab } from "@/components/content/articles-tab"
 import { TestimonialsTab } from "@/components/content/testimonials-tab"
 import { FAQsTab } from "@/components/content/faqs-tab"
+import { AdventurePostsTab } from "@/components/content/adventure-posts-tab"
 
 export default function ContentPage() {
   const searchParams = useSearchParams()
@@ -14,7 +15,7 @@ export default function ContentPage() {
   const [activeTab, setActiveTab] = useState("blog")
 
   useEffect(() => {
-    if (tabParam && ["blog", "articles", "testimonials", "faqs"].includes(tabParam)) {
+    if (tabParam && ["blog", "articles", "testimonials", "faqs", "adventure"].includes(tabParam)) {
       setActiveTab(tabParam)
     }
   }, [tabParam])
@@ -32,6 +33,7 @@ export default function ContentPage() {
           <TabsTrigger value="articles">Articles</TabsTrigger>
           <TabsTrigger value="testimonials">Testimonials</TabsTrigger>
           <TabsTrigger value="faqs">FAQs</TabsTrigger>
+          <TabsTrigger value="adventure">Adventure Posts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="blog" className="space-y-4">
@@ -48,6 +50,10 @@ export default function ContentPage() {
 
         <TabsContent value="faqs" className="space-y-4">
           <FAQsTab />
+        </TabsContent>
+
+        <TabsContent value="adventure" className="space-y-4">
+          <AdventurePostsTab />
         </TabsContent>
       </Tabs>
     </div>
