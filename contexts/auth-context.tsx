@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { useRouter, usePathname } from "next/navigation"
 
-export type UserRole = string // Allow any role name
+export type UserRole = string 
 
 export interface User {
   id?: string
@@ -32,20 +32,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  // Load user from localStorage on mount - ONLY ONCE
+ 
   useEffect(() => {
-    // Prevent multiple loads
+ 
     if (hasLoaded) return
 
     try {
-      // Check both 'token' and 'adminToken' for compatibility
+     
       const storedToken = localStorage.getItem("token") || localStorage.getItem("adminToken")
       const storedUser = localStorage.getItem("user")
 
       if (storedToken && storedUser) {
         setToken(storedToken)
         setUser(JSON.parse(storedUser))
-        // Also save as adminToken for backward compatibility
+       
         if (!localStorage.getItem("adminToken")) {
           localStorage.setItem("adminToken", storedToken)
         }
@@ -58,9 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [hasLoaded])
 
-  // Redirect to login if not authenticated on protected routes - ONLY check once after loading
+
   useEffect(() => {
-    // Only redirect after initial load is complete
+
     if (!hasLoaded || isLoading) return
     
     if (!user && pathname?.startsWith("/admin") && pathname !== "/login") {
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(data.token)
       setUser(data.user)
       
-      // Save to localStorage - save in both 'token' and 'adminToken' for compatibility
+
       localStorage.setItem("token", data.token)
       localStorage.setItem("adminToken", data.token) // Also save as adminToken
       localStorage.setItem("user", JSON.stringify(data.user))
