@@ -82,18 +82,13 @@ export function CaptainDetailsTab() {
     });
   }, []);
   
-
-
   useEffect(() => {
-    fetchCaptains()
-  }, [])
-
-  useEffect(() => {
+    const delay = searchQuery ? 500 : 0
     const timeoutId = setTimeout(() => {
-      fetchCaptains(1, searchQuery)
-    }, 500)
+      fetchCaptains(currentPage, searchQuery)
+    }, delay)
     return () => clearTimeout(timeoutId)
-  }, [searchQuery])
+  }, [currentPage, searchQuery])
 
   const fetchCaptains = async (page = 1, search = "") => {
     try {
@@ -103,18 +98,18 @@ export function CaptainDetailsTab() {
         page: page.toString(),
         limit: "10",
       })
-      
+
       const response = await fetch(`${API_BASE}/all?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
       const data = await response.json()
-      
+
       if (data.status) {
         let filteredCaptains = data.data.captains || []
         if (search) {
-          filteredCaptains = filteredCaptains.filter((c: Captain) => 
+          filteredCaptains = filteredCaptains.filter((c: Captain) =>
             c.name.toLowerCase().includes(search.toLowerCase()) ||
             c.email.toLowerCase().includes(search.toLowerCase()) ||
             c.phone.includes(search)
@@ -142,7 +137,6 @@ export function CaptainDetailsTab() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchCaptains(page, searchQuery)
   }
 
   const handleDeleteCaptain = async () => {

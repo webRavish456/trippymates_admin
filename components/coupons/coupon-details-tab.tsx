@@ -28,6 +28,7 @@ interface Coupon {
   validFrom: string
   validUntil: string
   usedCount: number
+  userLimit?: number | null
   applicableTo: string
   status: 'active' | 'inactive' | 'expired'
   createdAt: string
@@ -62,17 +63,13 @@ const router = useRouter()
   })
 
   const [coupons, setCoupons] = useState<Coupon[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const { toast } = useToast()
-
-  useEffect(() => {
-    fetchCoupons()
-  }, [])
 
   useEffect(() => {
     const couponsPermission = permissions.find(
@@ -83,14 +80,15 @@ const router = useRouter()
       update: couponsPermission?.update ?? false,
       delete: couponsPermission?.delete ?? false,
     })
-  }, [])
+  }, [permissions])
 
   useEffect(() => {
+    const delay = searchQuery ? 500 : 0
     const timeoutId = setTimeout(() => {
-      fetchCoupons(1, searchQuery)
-    }, 500)
+      fetchCoupons(currentPage, searchQuery)
+    }, delay)
     return () => clearTimeout(timeoutId)
-  }, [searchQuery])
+  }, [currentPage, searchQuery])
 
   const fetchCoupons = async (page = 1, search = "") => {
     try {
@@ -134,7 +132,6 @@ const router = useRouter()
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchCoupons(page, searchQuery)
   }
 
   const handleDeleteCoupon = async () => {
@@ -231,13 +228,14 @@ const router = useRouter()
                     <TableHead>Title</TableHead>
                     <TableHead>Discount</TableHead>
                     <TableHead>Valid Period</TableHead>
+                    <TableHead>User Limit</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {Array.from({ length: 5 }).map((_, index) => (
-                    <TableRowSkeleton key={index} columns={6} />
+                    <TableRowSkeleton key={index} columns={7} />
                   ))}
                 </TableBody>
               </Table>
@@ -248,19 +246,20 @@ const router = useRouter()
             <>
               <div className="rounded-md border">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Discount</TableHead>
-                      <TableHead>Valid Period</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {coupons.map((coupon) => (
-                      <TableRow key={coupon._id}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Discount</TableHead>
+                    <TableHead>Valid Period</TableHead>
+                    <TableHead>User Limit</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {coupons.map((coupon) => (
+                    <TableRow key={coupon._id}>
                         <TableCell className="font-mono font-semibold">{coupon.code}</TableCell>
                         <TableCell>{coupon.title}</TableCell>
                         <TableCell>
@@ -276,6 +275,11 @@ const router = useRouter()
                             <Calendar className="h-4 w-4" />
                             {new Date(coupon.validFrom).toLocaleDateString('en-GB', { timeZone: 'UTC' })} - {new Date(coupon.validUntil).toLocaleDateString('en-GB', { timeZone: 'UTC' })}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {coupon.userLimit === null || coupon.userLimit === undefined || coupon.userLimit === 0
+                            ? "Multi"
+                            : "1 per user"}
                         </TableCell>
                         <TableCell>{getStatusBadge(getActualStatus(coupon))}</TableCell>
                         <TableCell className="text-right">

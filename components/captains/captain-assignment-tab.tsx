@@ -88,17 +88,17 @@ export function CaptainAssignmentTab() {
 
 
   useEffect(() => {
-    fetchAssignments()
     fetchCaptains()
     fetchPackages()
   }, [])
 
   useEffect(() => {
+    const delay = searchQuery ? 500 : 0
     const timeoutId = setTimeout(() => {
-      fetchAssignments(1, filterCaptain, filterPackage, filterStatus)
-    }, 500)
+      fetchAssignments(currentPage, filterCaptain, filterPackage, filterStatus)
+    }, delay)
     return () => clearTimeout(timeoutId)
-  }, [filterCaptain, filterPackage, filterStatus])
+  }, [currentPage, filterCaptain, filterPackage, filterStatus, searchQuery])
 
   const fetchCaptains = async () => {
     try {
@@ -193,7 +193,6 @@ export function CaptainAssignmentTab() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchAssignments(page, filterCaptain, filterPackage, filterStatus)
   }
 
   const getStatusBadge = (status: string) => {

@@ -1,4 +1,5 @@
 import { Skeleton } from "@mui/material"
+import { Skeleton as ShadcnSkeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { TableCell, TableRow } from "@/components/ui/table"
 
@@ -116,6 +117,56 @@ export function ListSkeleton({ items = 5 }: { items?: number }) {
           <Skeleton variant="rectangular" width={80} height={32} />
         </div>
       ))}
+    </div>
+  )
+}
+
+// Edit page skeleton (back button + title + card with form fields)
+export function EditPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <ShadcnSkeleton className="h-10 w-10 rounded-md" />
+        <div className="space-y-2">
+          <ShadcnSkeleton className="h-8 w-56" />
+          <ShadcnSkeleton className="h-4 w-72" />
+        </div>
+      </div>
+      <Card>
+        <CardHeader>
+          <ShadcnSkeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <ShadcnSkeleton className="h-4 w-24" />
+              <ShadcnSkeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <ShadcnSkeleton className="h-4 w-24" />
+              <ShadcnSkeleton className="h-10 w-full" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <ShadcnSkeleton className="h-4 w-32" />
+            <ShadcnSkeleton className="h-24 w-full" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <ShadcnSkeleton className="h-4 w-28" />
+              <ShadcnSkeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <ShadcnSkeleton className="h-4 w-28" />
+              <ShadcnSkeleton className="h-10 w-full" />
+            </div>
+          </div>
+          <div className="flex gap-4 justify-end pt-4">
+            <ShadcnSkeleton className="h-10 w-24" />
+            <ShadcnSkeleton className="h-10 w-32" />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

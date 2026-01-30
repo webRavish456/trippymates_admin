@@ -32,6 +32,7 @@ interface Notification {
   }
   isRead: boolean
   isFavorite: boolean
+  actionTaken?: 'approved' | 'rejected' | null
   createdAt: string
 }
 
@@ -74,7 +75,7 @@ export default function NotificationsPage() {
       setNotifications(prev => 
         prev.map(notif => 
           notif._id === data.notificationId 
-            ? { ...notif, isRead: true }
+            ? { ...notif, isRead: true, actionTaken: 'approved' }
             : notif
         )
       )
@@ -84,7 +85,7 @@ export default function NotificationsPage() {
       setNotifications(prev => 
         prev.map(notif => 
           notif._id === data.notificationId 
-            ? { ...notif, isRead: true }
+            ? { ...notif, isRead: true, actionTaken: 'rejected' }
             : notif
         )
       )
@@ -255,7 +256,7 @@ export default function NotificationsPage() {
             title: "Success",
             description: "Community trip approved successfully",
           })
-          handleMarkAsRead(notification._id)
+          setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true, actionTaken: 'approved' } : n))
           fetchNotifications()
         } else {
           toast({
@@ -280,7 +281,7 @@ export default function NotificationsPage() {
             title: "Success",
             description: "Join request approved successfully",
           })
-          handleMarkAsRead(notification._id)
+          setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true, actionTaken: 'approved' } : n))
           fetchNotifications()
         } else {
           toast({
@@ -322,7 +323,7 @@ export default function NotificationsPage() {
             title: "Success",
             description: "Community trip rejected successfully",
           })
-          handleMarkAsRead(notification._id)
+          setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true, actionTaken: 'rejected' } : n))
           fetchNotifications()
         } else {
           toast({
@@ -347,7 +348,7 @@ export default function NotificationsPage() {
             title: "Success",
             description: "Join request rejected successfully",
           })
-          handleMarkAsRead(notification._id)
+          setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true, actionTaken: 'rejected' } : n))
           fetchNotifications()
         } else {
           toast({
@@ -577,7 +578,7 @@ export default function NotificationsPage() {
                                   )}
                                 </div>
                               </div>
-                              {(notification.type === 'community_trip_join_request' || notification.type === 'community_trip_creation_request') && !notification.isRead && (
+                              {(notification.type === 'community_trip_join_request' || notification.type === 'community_trip_creation_request') && !notification.actionTaken && (
                                 <div className="flex items-center gap-2 mt-4">
                                   <Button
                                     size="sm"

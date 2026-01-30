@@ -121,22 +121,6 @@ export function CommunityTripsTab() {
   })
 
   useEffect(() => {
-    fetchTrips()
-  }, [currentPage, statusFilter])
-
-  useEffect(() => {
-    // Debounce search query
-    const timeoutId = setTimeout(() => {
-      if (currentPage === 1) {
-        fetchTrips()
-      } else {
-        setCurrentPage(1)
-      }
-    }, 500)
-    return () => clearTimeout(timeoutId)
-  }, [searchQuery])
-
-  useEffect(() => {
     const communityTripsPermission = permissions.find(
       (p: Permission) => p.module === "community_trips"
     )
@@ -145,7 +129,15 @@ export function CommunityTripsTab() {
       update: communityTripsPermission?.update ?? false,
       delete: communityTripsPermission?.delete ?? false,
     })
-  }, [])
+  }, [permissions])
+
+  useEffect(() => {
+    const delay = searchQuery ? 500 : 0
+    const timeoutId = setTimeout(() => {
+      fetchTrips()
+    }, delay)
+    return () => clearTimeout(timeoutId)
+  }, [currentPage, statusFilter, searchQuery])
 
   const fetchTrips = async () => {
     try {

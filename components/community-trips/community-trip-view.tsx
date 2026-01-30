@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Users, Calendar, MapPin, MessageSquare, Send, Star } from "lucide-react"
+import { Users, Calendar, MapPin, MessageSquare, Send, Star, UserX, Mail, Phone, MapPin as AddressIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import io, { Socket } from "socket.io-client"
 import { API_BASE_URL } from "@/lib/config"
 
@@ -42,8 +43,8 @@ export default function CommunityTripView({ tripId }: CommunityTripViewProps) {
   const [messageType, setMessageType] = useState<'question' | 'general'>('general')
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const [removeMemberDialogOpen, setRemoveMemberDialogOpen] = useState(false)
+  const [memberToRemoveId, setMemberToRemoveId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchTrip()
@@ -229,14 +230,43 @@ export default function CommunityTripView({ tripId }: CommunityTripViewProps) {
   }
 
   const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
+    document.getElementById('messages-end')?.scrollIntoView({ behavior: 'smooth' })
   }
 
   const getMemberCount = () => {
     if (!trip) return 0
     return trip.members?.filter((m: any) => m.status === 'approved').length || 0
+  }
+
+  const handleRemoveMember = async (userId: string): Promise<boolean> => {
+    try {
+      const token = localStorage.getItem('adminToken')
+      const response = await fetch(`${API_BASE}/${tripId}/member/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const result = await response.json()
+      if (result.status) {
+        toast({ title: "Success", description: "Member removed from trip" })
+        setTrip(result.data)
+        return true
+      } else {
+        toast({ title: "Error", description: result.message || "Failed to remove member", variant: "destructive" })
+        return false
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to remove member", variant: "destructive" })
+      return false
+    }
+  }
+
+  const onConfirmRemoveMember = async () => {
+    if (!memberToRemoveId) return
+    const success = await handleRemoveMember(memberToRemoveId)
+    if (success) {
+      setRemoveMemberDialogOpen(false)
+      setMemberToRemoveId(null)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -387,7 +417,6 @@ export default function CommunityTripView({ tripId }: CommunityTripViewProps) {
             <CardContent className="p-0">
               {/* Messages Container */}
               <div 
-                ref={scrollAreaRef}
                 className="h-[500px] overflow-y-auto p-4 bg-slate-50"
                 style={{ scrollBehavior: 'smooth' }}
               >
@@ -452,7 +481,7 @@ export default function CommunityTripView({ tripId }: CommunityTripViewProps) {
                         </div>
                       )
                     })}
-                    <div ref={messagesEndRef} />
+                    <div id="messages-end" />
                   </div>
                 )}
               </div>
@@ -523,32 +552,65 @@ export default function CommunityTripView({ tripId }: CommunityTripViewProps) {
             </CardContent>
           </Card>
 
-          {/* Members List */}
+          {/* Members List - name, email, phone, address, profile picture + Remove */}
           <Card>
             <CardHeader>
               <CardTitle>Members ({getMemberCount()})</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] overflow-y-auto">
-                <div className="space-y-2">
+              <div className="max-h-[400px] overflow-y-auto">
+                <div className="space-y-4">
                   {trip.members?.filter((m: any) => m.status === 'approved').map((member: any, idx: number) => {
-                    const userName = member.userId?.name || member.userId?.email || 'Member';
+                    const user = member.userId;
+                    const userId = user?._id || user?.id;
+                    const userName = user?.name || user?.email || 'Member';
                     const userInitial = userName[0]?.toUpperCase() || 'M';
+                    const profileImg = user?.profilePicture || user?.profileImage;
                     return (
-                      <div key={idx} className="flex items-center gap-2 p-2 rounded hover:bg-secondary">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={member.userId?.profileImage} />
-                          <AvatarFallback>{userInitial}</AvatarFallback>
+                      <div key={userId || idx} className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
+                        <Avatar className="h-14 w-14 shrink-0">
+                          <AvatarImage src={profileImg} alt={userName} />
+                          <AvatarFallback className="text-lg">{userInitial}</AvatarFallback>
                         </Avatar>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{userName}</p>
-                          <p className="text-xs text-muted-foreground">
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <p className="font-semibold text-base">{userName}</p>
+                          {user?.email && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Mail className="h-3.5 w-3.5 shrink-0" />
+                              <span>{user.email}</span>
+                            </div>
+                          )}
+                          {user?.phone && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Phone className="h-3.5 w-3.5 shrink-0" />
+                              <span>{user.phone}</span>
+                            </div>
+                          )}
+                          {user?.address && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <AddressIcon className="h-3.5 w-3.5 shrink-0" />
+                              <span className="break-words">{user.address}</span>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground pt-1">
                             Joined {formatDate(member.joinedAt)}
                           </p>
                         </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={() => userId && (setMemberToRemoveId(userId), setRemoveMemberDialogOpen(true))}
+                        >
+                          <UserX className="h-4 w-4 mr-1" />
+                          Remove
+                        </Button>
                       </div>
                     );
                   })}
+                  {(!trip.members?.length || getMemberCount() === 0) && (
+                    <p className="text-sm text-muted-foreground text-center py-6">No members joined yet.</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -556,6 +618,27 @@ export default function CommunityTripView({ tripId }: CommunityTripViewProps) {
 
         </div>
       </div>
+
+      {/* Remove Member Confirmation Dialog */}
+      <AlertDialog open={removeMemberDialogOpen} onOpenChange={(open) => {
+        setRemoveMemberDialogOpen(open)
+        if (!open) setMemberToRemoveId(null)
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this member from the trip?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={onConfirmRemoveMember} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

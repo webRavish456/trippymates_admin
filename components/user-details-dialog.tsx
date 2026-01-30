@@ -30,8 +30,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* ✅ Increased width from max-w-4xl → max-w-6xl */}
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>User Details</DialogTitle>
           <DialogDescription>

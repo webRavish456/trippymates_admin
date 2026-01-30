@@ -61,10 +61,6 @@ export function BannerTab() {
   const { toast } = useToast()
 
   useEffect(() => {
-    fetchBanners()
-  }, [])
-
-  useEffect(() => {
     const bannersPermission = permissions.find(
       (p: Permission) => p.module === "banner"
     )
@@ -73,14 +69,15 @@ export function BannerTab() {
       update: bannersPermission?.update ?? false,
       delete: bannersPermission?.delete ?? false,
     })
-  }, [])
+  }, [permissions])
 
   useEffect(() => {
+    const delay = searchQuery ? 500 : 0
     const timeoutId = setTimeout(() => {
-      fetchBanners(1, searchQuery)
-    }, 500)
+      fetchBanners(currentPage, searchQuery)
+    }, delay)
     return () => clearTimeout(timeoutId)
-  }, [searchQuery])
+  }, [currentPage, searchQuery])
 
   const fetchBanners = async (page = 1, search = "") => {
     try {
@@ -127,7 +124,6 @@ export function BannerTab() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchBanners(page, searchQuery)
   }
 
   const handleDeleteBanner = async () => {

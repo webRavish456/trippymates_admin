@@ -133,6 +133,25 @@ export function NotificationDropdown({ adminToken, adminId }: NotificationDropdo
     }
   }
 
+  const handleBellClick = async () => {
+    if (unreadCount > 0 && adminToken) {
+      try {
+        const baseUrl = API_BASE_URL.replace(/\/+$/, '').replace(/\/api$/, '')
+        await fetch(`${baseUrl}/api/admin/notifications/read-all`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        setUnreadCount(0)
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+      } catch (e) {
+        console.error("Error marking notifications as read:", e)
+      }
+    }
+    router.push('/admin/notifications')
+  }
 
   return (
     <div className="relative">
@@ -140,9 +159,7 @@ export function NotificationDropdown({ adminToken, adminId }: NotificationDropdo
         variant="ghost" 
         size="icon" 
         className="relative"
-        onClick={() => {
-          router.push('/admin/notifications')
-        }}
+        onClick={handleBellClick}
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (

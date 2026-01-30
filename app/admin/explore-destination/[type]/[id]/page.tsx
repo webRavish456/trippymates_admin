@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import { EditPageSkeleton } from "@/components/ui/skeletons"
 
 const API_BASE = `${API_BASE_URL}/api/admin/destination`
 
@@ -62,14 +63,7 @@ export default function EditDestinationPage() {
 
   const getFormComponent = () => {
     if (loading) {
-      return (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading destination...</p>
-          </div>
-        </div>
-      )
+      return <EditPageSkeleton />
     }
 
     switch (type) {

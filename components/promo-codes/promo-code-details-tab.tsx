@@ -63,17 +63,13 @@ export function PromoCodeDetailsTab() {
   })
  
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedPromoCode, setSelectedPromoCode] = useState<PromoCode | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const { toast } = useToast()
-
-  useEffect(() => {
-    fetchPromoCodes()
-  }, [])
 
   useEffect(() => {
     const promotionsPermission = permissions.find(
@@ -84,14 +80,15 @@ export function PromoCodeDetailsTab() {
       update: promotionsPermission?.update ?? false,
       delete: promotionsPermission?.delete ?? false,
     })
-  }, [])
+  }, [permissions])
 
   useEffect(() => {
+    const delay = searchQuery ? 500 : 0
     const timeoutId = setTimeout(() => {
-      fetchPromoCodes(1, searchQuery)
-    }, 500)
+      fetchPromoCodes(currentPage, searchQuery)
+    }, delay)
     return () => clearTimeout(timeoutId)
-  }, [searchQuery])
+  }, [currentPage, searchQuery])
 
   const fetchPromoCodes = async (page = 1, search = "") => {
     try {
@@ -135,7 +132,6 @@ export function PromoCodeDetailsTab() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchPromoCodes(page, searchQuery)
   }
 
   const handleDeletePromoCode = async () => {
@@ -281,9 +277,9 @@ export function PromoCodeDetailsTab() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {promoCode.userLimit === null || promoCode.userLimit === 0 
-                            ? "Unlimited" 
-                            : `${promoCode.userLimit} per user`}
+                          {promoCode.userLimit === null || promoCode.userLimit === undefined || promoCode.userLimit === 0 
+                            ? "Multi" 
+                            : "1 per user"}
                         </TableCell>
                         <TableCell>{getStatusBadge(getActualStatus(promoCode))}</TableCell>
                         <TableCell className="text-right">

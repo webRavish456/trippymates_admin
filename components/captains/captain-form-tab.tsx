@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CaptainAvailabilityTab } from "./captain-availability-tab"
 import { CaptainPaymentTab } from "./captain-payment-tab"
 import { API_BASE_URL } from "@/lib/config"
+import { EditPageSkeleton } from "@/components/ui/skeletons"
 
 const API_BASE = `${API_BASE_URL}/api/admin/captain`
 
@@ -24,6 +25,7 @@ export function CaptainFormTab() {
   const captainId = params?.id as string
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(!!(captainId && captainId !== "new"))
 
   const [formData, setFormData] = useState({
     name: "",
@@ -80,6 +82,7 @@ export function CaptainFormTab() {
 
   const fetchCaptain = async (id: string) => {
     try {
+      setLoading(true)
       const token = localStorage.getItem('adminToken')
       const response = await fetch(`${API_BASE}/${id}`, {
         headers: {
@@ -151,6 +154,8 @@ export function CaptainFormTab() {
         description: error.message || "Failed to fetch captain",
         variant: "destructive",
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -290,6 +295,10 @@ export function CaptainFormTab() {
   }
 
   const isNewCaptain = !captainId || captainId === 'new'
+
+  if (loading) {
+    return <EditPageSkeleton />
+  }
 
   return (
     <div className="space-y-4 pb-0">

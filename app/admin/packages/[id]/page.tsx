@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react"
 import { PackageForm } from "@/components/packages/package-form"
 import { useToast } from "@/hooks/use-toast"
 import { API_BASE_URL } from "@/lib/config"
+import { EditPageSkeleton } from "@/components/ui/skeletons"
 
 const API_BASE = `${API_BASE_URL}/api/admin/packages`
 
@@ -80,12 +81,7 @@ export default function EditPackagePage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading package...</p>
-          </div>
-        </div>
+        <EditPageSkeleton />
       ) : (
         <PackageForm initialData={packageData} isEdit={mode === "edit"} />
       )}

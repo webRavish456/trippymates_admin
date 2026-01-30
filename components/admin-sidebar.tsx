@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import NextImage from "next/image"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import {
@@ -23,6 +24,7 @@ import {
   UserCheck,
   Bell,
   Shield,
+  Award,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -94,6 +96,8 @@ const navigation: NavItem[] = [
     ],
   },
 
+  { name: "Reward Code", href: "/admin/reward-code/management", icon: Award, module: "reward_management" },
+
   {
     name: "Content",
     icon: FileText,
@@ -152,8 +156,7 @@ export function AdminSidebar() {
   return (
     <aside className="flex h-full w-64 flex-col border-r bg-sidebar">
       <div className="flex h-16 items-center gap-2 border-b px-6">
-        <Map className="h-6 w-6" />
-        <span className="text-lg font-semibold">TravelAdmin</span>
+        <NextImage src="/logo.png" alt="Logo" width={120} height={40} className="object-contain" />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">

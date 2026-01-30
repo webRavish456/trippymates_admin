@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { API_BASE_URL } from "@/lib/config"
+import { EditPageSkeleton } from "@/components/ui/skeletons"
 
 const API_BASE = `${API_BASE_URL}/api/admin/banner`
 
@@ -20,6 +21,7 @@ export function BannerFormTab() {
   const bannerId = params?.id as string
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(!!(bannerId && bannerId !== "new"))
 
   const [formData, setFormData] = useState({
     title: "",
@@ -41,6 +43,7 @@ export function BannerFormTab() {
 
   const fetchBanner = async (id: string) => {
     try {
+      setLoading(true)
       const token = localStorage.getItem('adminToken')
       const response = await fetch(`${API_BASE}/${id}`, {
         headers: {
@@ -70,6 +73,8 @@ export function BannerFormTab() {
         description: error.message || "Failed to fetch banner",
         variant: "destructive",
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -167,6 +172,10 @@ export function BannerFormTab() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return <EditPageSkeleton />
   }
 
   return (

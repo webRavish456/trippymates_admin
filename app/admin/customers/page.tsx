@@ -196,9 +196,9 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
 
-      {/* User Details Dialog - INCREASED WIDTH TO max-w-7xl */}
+      {/* User Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>User Details</DialogTitle>
             <DialogDescription>Complete information about this user and their booking history</DialogDescription>

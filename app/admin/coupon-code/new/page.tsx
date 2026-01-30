@@ -44,7 +44,7 @@ export default function CreateCouponPage() {
       const payload = {
         ...formData,
         maxDiscountAmount: formData.maxDiscountAmount || null,
-        userLimit: formData.oneTimeUseOnly ? 1 : formData.userLimit
+        userLimit: formData.oneTimeUseOnly ? 1 : null
       }
       // Remove oneTimeUseOnly from payload as it's not needed in backend
       delete payload.oneTimeUseOnly

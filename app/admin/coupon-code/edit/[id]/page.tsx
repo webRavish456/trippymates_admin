@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { API_BASE_URL } from "@/lib/config"
+import { EditPageSkeleton } from "@/components/ui/skeletons"
 
 const API_BASE = `${API_BASE_URL}/api/admin/coupon`
 
@@ -103,7 +104,7 @@ export default function EditCouponPage() {
       const payload = {
         ...formData,
         maxDiscountAmount: formData.maxDiscountAmount || null,
-        userLimit: formData.oneTimeUseOnly ? 1 : formData.userLimit
+        userLimit: formData.oneTimeUseOnly ? 1 : null
       }
       // Remove oneTimeUseOnly from payload as it's not needed in backend
       delete payload.oneTimeUseOnly
@@ -140,13 +141,7 @@ export default function EditCouponPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-muted-foreground">Loading coupon...</p>
-        </div>
-      </div>
-    )
+    return <EditPageSkeleton />
   }
 
   return (

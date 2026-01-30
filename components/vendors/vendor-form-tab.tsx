@@ -14,6 +14,7 @@ import { Plus, X } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { API_BASE_URL } from "@/lib/config"
+import { EditPageSkeleton } from "@/components/ui/skeletons"
 
 const API_BASE = `${API_BASE_URL}/api/admin/vendor`
 
@@ -23,6 +24,7 @@ export function VendorFormTab() {
   const vendorId = params?.id as string
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(!!(vendorId && vendorId !== "new"))
   const [documentFiles, setDocumentFiles] = useState({
     aadhaarCard: null as File | null,
     panCard: null as File | null,
@@ -110,6 +112,7 @@ export function VendorFormTab() {
 
   const fetchVendor = async () => {
     try {
+      setLoading(true)
       const token = localStorage.getItem('adminToken')
       const response = await fetch(`${API_BASE}/getVendor?page=1&limit=1000`, {
         headers: {
@@ -150,6 +153,8 @@ export function VendorFormTab() {
         description: error.message || "Failed to fetch vendor",
         variant: "destructive",
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -223,6 +228,10 @@ export function VendorFormTab() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return <EditPageSkeleton />
   }
 
   return (

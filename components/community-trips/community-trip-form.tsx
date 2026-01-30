@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { API_BASE_URL } from "@/lib/config"
+import { EditPageSkeleton } from "@/components/ui/skeletons"
 
 const API_BASE = `${API_BASE_URL}/api/admin/community-trip`
 
@@ -155,7 +156,7 @@ export default function CommunityTripForm({ tripId }: CommunityTripFormProps) {
   }
 
   if (loading) {
-    return <div className="p-6">Loading...</div>
+    return <EditPageSkeleton />
   }
 
   return (

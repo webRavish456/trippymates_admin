@@ -31,15 +31,7 @@ export function AdminHeader() {
   const adminToken = typeof window !== 'undefined' ? (localStorage.getItem('adminToken') || localStorage.getItem('token')) : null
 
   return (
-    <header className="flex h-16 items-center justify-between gap-4 border-b bg-background px-6">
-      {/* Search */}
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input type="search" placeholder="Search trips, bookings, users..." className="pl-9" />
-        </div>
-      </div>
-
+    <header className="flex h-16 items-center justify-end gap-4 border-b bg-background px-6">
       {/* Actions */}
       <div className="flex items-center gap-4">
         {adminToken && (

@@ -179,15 +179,14 @@ function CalendarDayButton({
   ...props
 }: React.ComponentProps<typeof DayButton>) {
   const defaultClassNames = getDefaultClassNames()
-
-  const ref = React.useRef<HTMLButtonElement>(null)
+  const [buttonEl, setButtonEl] = React.useState<HTMLButtonElement | null>(null)
   React.useEffect(() => {
-    if (modifiers.focused) ref.current?.focus()
-  }, [modifiers.focused])
+    if (modifiers.focused && buttonEl) buttonEl.focus()
+  }, [modifiers.focused, buttonEl])
 
   return (
     <Button
-      ref={ref}
+      ref={setButtonEl}
       variant="ghost"
       size="icon"
       data-day={day.date.toLocaleDateString()}

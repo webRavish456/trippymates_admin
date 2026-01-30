@@ -58,6 +58,7 @@ const PERMISSIONS: PermissionConfig[] = [
   { key: "coupon_management", label: "Coupon Management", readOnly: true },
   { key: "promo_details", label: "Promo Details" },
   { key: "promo_management", label: "Promo Management", readOnly: true },
+  { key: "reward_management", label: "Reward Management", readOnly: true },
   { key: "content", label: "Content" },
   { key: "notifications", label: "Notifications", readOnly: true },
   { key: "report", label: "Report", readOnly: true },
@@ -750,7 +751,7 @@ export default function RolesAndPermissionsPage() {
                     </td>
                   </tr>
                 ) : (
-                  roles.reverse().map((role) => (
+                  roles.map((role) => (
                     <tr key={role._id} className="border-b hover:bg-muted/50">
                       <td className="p-4">
                         <div className="font-medium">{role.name}</div>

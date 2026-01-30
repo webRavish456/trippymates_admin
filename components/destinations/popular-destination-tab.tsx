@@ -128,11 +128,12 @@ export function PopularDestinationTab() {
   const { toast } = useToast()
 
   useEffect(() => {
-    if(loading){
+    const delay = searchQuery ? 500 : 0
+    const timeoutId = setTimeout(() => {
       fetchDestinations()
-    }
-    setCurrentPage(1) 
-  }, [searchQuery, loading])
+    }, delay)
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery])
 
   useEffect(() => {
     const popularDestinationPermission = permissions.find(

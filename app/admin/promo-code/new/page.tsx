@@ -44,7 +44,7 @@ export default function CreatePromoCodePage() {
       const payload = {
         ...formData,
         maxDiscountAmount: formData.maxDiscountAmount || null,
-        userLimit: formData.oneTimeUseOnly ? 1 : formData.userLimit
+        userLimit: formData.oneTimeUseOnly ? 1 : null
       }
     
       const response = await fetch(`${API_BASE}/add`, {

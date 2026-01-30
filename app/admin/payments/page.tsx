@@ -110,18 +110,12 @@ export default function PaymentsPage() {
   }
 
   useEffect(() => {
-    fetchPayments()
-  }, [statusFilter, paymentStatusFilter])
-
-  useEffect(() => {
-    // Debounce search
+    const delay = searchQuery ? 500 : 0
     const timer = setTimeout(() => {
-      if (searchQuery || !searchQuery) {
-        fetchPayments()
-      }
-    }, 500)
+      fetchPayments()
+    }, delay)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [statusFilter, paymentStatusFilter, searchQuery])
 
   const filteredPayments = payments.filter((payment) => {
     if (statusFilter !== "all" && payment.bookingStatus !== statusFilter) {

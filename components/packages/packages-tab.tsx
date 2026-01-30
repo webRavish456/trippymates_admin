@@ -72,7 +72,7 @@ export function PackagesTab() {
  
   const router = useRouter()
   const [packages, setPackages] = useState<Package[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("")
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -87,7 +87,6 @@ export function PackagesTab() {
   const { toast } = useToast()
 
   useEffect(() => {
-    fetchPackages()
     fetchCategories()
   }, [])
 
@@ -100,18 +99,15 @@ export function PackagesTab() {
       update: packagesPermission?.update ?? false,
       delete: packagesPermission?.delete ?? false,
     })
-  }, [])
+  }, [permissions])
 
   useEffect(() => {
+    const delay = searchQuery ? 500 : 0
     const timeoutId = setTimeout(() => {
-      if (searchQuery) {
-        fetchPackages(1, searchQuery)
-      } else {
-        fetchPackages()
-      }
-    }, 500)
+      fetchPackages(currentPage, searchQuery)
+    }, delay)
     return () => clearTimeout(timeoutId)
-  }, [searchQuery])
+  }, [currentPage, searchQuery])
 
   const fetchCategories = async () => {
     try {
@@ -161,7 +157,6 @@ export function PackagesTab() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchPackages(page, searchQuery)
   }
 
   const handleViewPackage = async (pkg: Package) => {
